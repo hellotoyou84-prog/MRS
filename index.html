@@ -1,0 +1,1072 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>하이브리드 룸 스캐너</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: white;
+            overflow-x: hidden;
+        }
+        
+        .container {
+            max-width: 400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .method-selector {
+            background: rgba(255,255,255,0.15);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        
+        .method-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+        
+        .method-tab {
+            flex: 1;
+            padding: 12px 8px;
+            border: none;
+            border-radius: 10px;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 13px;
+            text-align: center;
+        }
+        
+        .method-tab.active {
+            background: rgba(255,255,255,0.4);
+            transform: scale(1.05);
+        }
+        
+        .camera-section {
+            display: none;
+        }
+        
+        .camera-section.active {
+            display: block;
+        }
+        
+        .camera-container {
+            background: rgba(0,0,0,0.8);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        #videoElement {
+            width: 100%;
+            max-width: 300px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+        }
+        
+        #capturedImage {
+            width: 100%;
+            max-width: 300px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            display: none;
+        }
+        
+        .camera-controls {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-bottom: 15px;
+        }
+        
+        .btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 12px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .btn-camera {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            box-shadow: 0 4px 15px rgba(102,126,234,0.4);
+        }
+        
+        .btn-primary {
+            background: linear-gradient(45deg, #ff6b6b, #ff8e8e);
+            color: white;
+            box-shadow: 0 4px 15px rgba(255,107,107,0.4);
+        }
+        
+        .btn-secondary {
+            background: linear-gradient(45deg, #4ecdc4, #44a08d);
+            color: white;
+            box-shadow: 0 4px 15px rgba(78,205,196,0.4);
+        }
+        
+        .btn-success {
+            background: linear-gradient(45deg, #51cf66, #40c057);
+            color: white;
+            box-shadow: 0 4px 15px rgba(81,207,102,0.4);
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+        
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+        
+        .analysis-section {
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        
+        .analysis-section.active {
+            display: block;
+        }
+        
+        .edge-detection-canvas {
+            background: white;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            width: 100%;
+        }
+        
+        .detection-results {
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .corner-list {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .corner-item {
+            background: rgba(255,255,255,0.2);
+            padding: 8px;
+            border-radius: 8px;
+            text-align: center;
+            font-size: 12px;
+        }
+        
+        .walking-section {
+            display: block;
+        }
+        
+        .walking-section.active {
+            display: block;
+        }
+        
+        .sensor-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+            background: rgba(255,255,255,0.15);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        
+        .sensor-item {
+            text-align: center;
+            padding: 15px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 12px;
+        }
+        
+        .sensor-value {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .sensor-label {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+        
+        .canvas-container {
+            background: rgba(255,255,255,0.9);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        #roomCanvas {
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            background: white;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        
+        .room-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .room-stat {
+            text-align: center;
+            color: #333;
+        }
+        
+        .room-stat-value {
+            font-size: 18px;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .room-stat-label {
+            font-size: 12px;
+            opacity: 0.7;
+        }
+        
+        .instructions {
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .instructions h3 {
+            margin-bottom: 10px;
+            color: #ffd700;
+        }
+        
+        .instructions p {
+            line-height: 1.5;
+            opacity: 0.9;
+            margin-bottom: 8px;
+        }
+        
+        .recording-indicator {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #ff4757;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-weight: bold;
+            animation: pulse 2s infinite;
+            z-index: 1000;
+            display: none;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div class="recording-indicator" id="recordingIndicator">
+        🔴 측정 중...
+    </div>
+    
+    <div class="container">
+        <div class="header">
+            <h1>🏠📸 하이브리드 스캐너</h1>
+            <p>사진 촬영 + 걸어다니기 측정</p>
+        </div>
+        
+        <div class="method-selector">
+            <div class="method-tabs">
+                <button class="method-tab active" data-method="photo">📸 사진 촬영</button>
+                <button class="method-tab" data-method="walking">🚶 걸어다니기</button>
+                <button class="method-tab" data-method="hybrid">🔄 하이브리드</button>
+            </div>
+        </div>
+        
+        <!-- 사진 촬영 섹션 -->
+        <div class="camera-section active" id="photoSection">
+            <div class="camera-container">
+                <video id="videoElement" autoplay playsinline></video>
+                <img id="capturedImage" alt="촬영된 이미지">
+                
+                <div class="camera-controls">
+                    <button class="btn btn-camera" id="startCameraBtn">카메라 시작</button>
+                    <button class="btn btn-primary" id="captureBtn" disabled>📸 촬영</button>
+                    <button class="btn btn-secondary" id="analyzeBtn" disabled>🔍 분석</button>
+                </div>
+            </div>
+            
+            <div class="analysis-section" id="analysisSection">
+                <h3>🔍 모서리 검출 결과</h3>
+                <canvas id="edgeCanvas" class="edge-detection-canvas" width="300" height="200"></canvas>
+                
+                <div class="detection-results">
+                    <div style="font-weight: bold; margin-bottom: 10px;">감지된 모서리</div>
+                    <div class="corner-list" id="cornerList"></div>
+                </div>
+                
+                <button class="btn btn-success" id="applyPhotoBtn">📐 평면도 적용</button>
+            </div>
+        </div>
+        
+        <!-- 걸어다니기 섹션 -->
+        <div class="walking-section" id="walkingSection">
+            <div class="sensor-info">
+                <div class="sensor-item">
+                    <div class="sensor-value" id="orientation">0°</div>
+                    <div class="sensor-label">방향</div>
+                </div>
+                <div class="sensor-item">
+                    <div class="sensor-value" id="acceleration">0.0</div>
+                    <div class="sensor-label">가속도</div>
+                </div>
+                <div class="sensor-item">
+                    <div class="sensor-value" id="stepCount">0</div>
+                    <div class="sensor-label">걸음 수</div>
+                </div>
+                <div class="sensor-item">
+                    <div class="sensor-value" id="distance">0.0m</div>
+                    <div class="sensor-label">이동거리</div>
+                </div>
+            </div>
+            
+            <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                <button class="btn btn-primary" id="startWalkingBtn">🚶 걸어다니기 시작</button>
+                <button class="btn btn-secondary" id="resetBtn">초기화</button>
+            </div>
+        </div>
+        
+        <!-- 공통 캔버스 -->
+        <div class="canvas-container">
+            <canvas id="roomCanvas" width="300" height="300"></canvas>
+            <div class="room-info">
+                <div class="room-stat">
+                    <div class="room-stat-value" id="roomWidth">0.0m</div>
+                    <div class="room-stat-label">가로</div>
+                </div>
+                <div class="room-stat">
+                    <div class="room-stat-value" id="roomHeight">0.0m</div>
+                    <div class="room-stat-label">세로</div>
+                </div>
+                <div class="room-stat">
+                    <div class="room-stat-value" id="roomArea">0.0㎡</div>
+                    <div class="room-stat-label">면적</div>
+                </div>
+                <div class="room-stat">
+                    <div class="room-stat-value" id="roomPerimeter">0.0m</div>
+                    <div class="room-stat-label">둘레</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="instructions">
+            <h3>📋 사용 방법</h3>
+            <p><strong>📸 사진 촬영 모드:</strong></p>
+            <p>• 방의 모서리가 잘 보이도록 촬영하세요</p>
+            <p>• AI가 자동으로 모서리를 검출합니다</p>
+            <p>• 원근법을 고려해 거리를 계산합니다</p>
+            <br>
+            <p><strong>🚶 걸어다니기 모드:</strong></p>
+            <p>• 벽을 따라 천천히 걸어다니세요</p>
+            <p>• 센서로 정확한 거리를 측정합니다</p>
+            <br>
+            <p><strong>🔄 하이브리드 모드:</strong></p>
+            <p>• 사진으로 초기 구조를 잡고</p>
+            <p>• 걸어다니며 정확한 크기를 보정합니다</p>
+        </div>
+    </div>
+
+    <script>
+        class HybridRoomScanner {
+            constructor() {
+                this.currentMethod = 'photo';
+                this.isScanning = false;
+                
+                // 걸어다니기 관련
+                this.stepCount = 0;
+                this.totalDistance = 0;
+                this.currentPosition = { x: 150, y: 150 };
+                this.path = [];
+                this.orientation = 0;
+                this.stepThreshold = 12;
+                this.lastStepTime = 0;
+                this.stepLength = 0.7;
+                
+                // 사진 분석 관련
+                this.videoElement = document.getElementById('videoElement');
+                this.capturedImage = document.getElementById('capturedImage');
+                this.edgeCanvas = document.getElementById('edgeCanvas');
+                this.edgeCtx = this.edgeCanvas.getContext('2d');
+                this.stream = null;
+                this.imageData = null;
+                this.detectedCorners = [];
+                
+                // 캔버스
+                this.canvas = document.getElementById('roomCanvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.scale = 50;
+                
+                this.initializeElements();
+                this.setupEventListeners();
+                this.drawInitialRoom();
+            }
+            
+            initializeElements() {
+                // 메소드 탭
+                this.methodTabs = document.querySelectorAll('.method-tab');
+                
+                // 사진 관련 버튼
+                this.startCameraBtn = document.getElementById('startCameraBtn');
+                this.captureBtn = document.getElementById('captureBtn');
+                this.analyzeBtn = document.getElementById('analyzeBtn');
+                this.applyPhotoBtn = document.getElementById('applyPhotoBtn');
+                
+                // 걸어다니기 관련 버튼
+                this.startWalkingBtn = document.getElementById('startWalkingBtn');
+                this.resetBtn = document.getElementById('resetBtn');
+                this.recordingIndicator = document.getElementById('recordingIndicator');
+                
+                // 센서 디스플레이
+                this.orientationDisplay = document.getElementById('orientation');
+                this.accelerationDisplay = document.getElementById('acceleration');
+                this.stepCountDisplay = document.getElementById('stepCount');
+                this.distanceDisplay = document.getElementById('distance');
+                
+                // 방 정보 디스플레이
+                this.roomWidthDisplay = document.getElementById('roomWidth');
+                this.roomHeightDisplay = document.getElementById('roomHeight');
+                this.roomAreaDisplay = document.getElementById('roomArea');
+                this.roomPerimeterDisplay = document.getElementById('roomPerimeter');
+                
+                // 섹션들
+                this.photoSection = document.getElementById('photoSection');
+                this.walkingSection = document.getElementById('walkingSection');
+                this.analysisSection = document.getElementById('analysisSection');
+                this.cornerList = document.getElementById('cornerList');
+            }
+            
+            setupEventListeners() {
+                // 메소드 변경
+                this.methodTabs.forEach(tab => {
+                    tab.addEventListener('click', (e) => this.changeMethod(e.target.dataset.method));
+                });
+                
+                // 사진 관련 이벤트
+                this.startCameraBtn.addEventListener('click', () => this.startCamera());
+                this.captureBtn.addEventListener('click', () => this.capturePhoto());
+                this.analyzeBtn.addEventListener('click', () => this.analyzePhoto());
+                this.applyPhotoBtn.addEventListener('click', () => this.applyPhotoResults());
+                
+                // 걸어다니기 관련 이벤트
+                this.startWalkingBtn.addEventListener('click', () => this.toggleWalking());
+                this.resetBtn.addEventListener('click', () => this.reset());
+            }
+            
+            changeMethod(method) {
+                this.currentMethod = method;
+                
+                // 탭 활성화
+                this.methodTabs.forEach(tab => tab.classList.remove('active'));
+                document.querySelector(`[data-method="${method}"]`).classList.add('active');
+                
+                // 섹션 표시/숨김
+                this.photoSection.classList.remove('active');
+                this.walkingSection.classList.remove('active');
+                
+                if (method === 'photo' || method === 'hybrid') {
+                    this.photoSection.classList.add('active');
+                }
+                if (method === 'walking' || method === 'hybrid') {
+                    this.walkingSection.classList.add('active');
+                }
+            }
+            
+            async startCamera() {
+                try {
+                    this.stream = await navigator.mediaDevices.getUserMedia({
+                        video: { 
+                            facingMode: 'environment', // 후면 카메라 우선
+                            width: { ideal: 1280 },
+                            height: { ideal: 720 }
+                        }
+                    });
+                    
+                    this.videoElement.srcObject = this.stream;
+                    this.startCameraBtn.textContent = '카메라 실행 중';
+                    this.startCameraBtn.disabled = true;
+                    this.captureBtn.disabled = false;
+                    
+                } catch (error) {
+                    console.error('카메라 접근 실패:', error);
+                    alert('카메라에 접근할 수 없습니다. 권한을 확인해주세요.');
+                }
+            }
+            
+            capturePhoto() {
+                // 캔버스에 비디오 프레임 캡처
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                
+                canvas.width = this.videoElement.videoWidth;
+                canvas.height = this.videoElement.videoHeight;
+                
+                ctx.drawImage(this.videoElement, 0, 0);
+                
+                // 이미지 데이터 저장
+                this.imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                
+                // 캡처된 이미지 표시
+                this.capturedImage.src = canvas.toDataURL();
+                this.capturedImage.style.display = 'block';
+                this.videoElement.style.display = 'none';
+                
+                // 카메라 스트림 정지
+                if (this.stream) {
+                    this.stream.getTracks().forEach(track => track.stop());
+                }
+                
+                this.captureBtn.disabled = true;
+                this.analyzeBtn.disabled = false;
+            }
+            
+            analyzePhoto() {
+                if (!this.imageData) return;
+                
+                // 간단한 엣지 검출 구현 (실제로는 OpenCV.js 사용 권장)
+                const edges = this.detectEdges(this.imageData);
+                const corners = this.detectCorners(edges);
+                
+                this.detectedCorners = corners;
+                this.displayEdgeDetection(edges);
+                this.displayCorners(corners);
+                
+                this.analysisSection.classList.add('active');
+                this.applyPhotoBtn.disabled = false;
+            }
+            
+            detectEdges(imageData) {
+                // 간단한 Sobel 엣지 검출 구현
+                const width = imageData.width;
+                const height = imageData.height;
+                const data = imageData.data;
+                const edges = new Uint8ClampedArray(width * height);
+                
+                // Sobel 필터
+                const sobelX = [-1, 0, 1, -2, 0, 2, -1, 0, 1];
+                const sobelY = [-1, -2, -1, 0, 0, 0, 1, 2, 1];
+                
+                for (let y = 1; y < height - 1; y++) {
+                    for (let x = 1; x < width - 1; x++) {
+                        let gx = 0, gy = 0;
+                        
+                        for (let ky = -1; ky <= 1; ky++) {
+                            for (let kx = -1; kx <= 1; kx++) {
+                                const idx = ((y + ky) * width + (x + kx)) * 4;
+                                const gray = (data[idx] + data[idx + 1] + data[idx + 2]) / 3;
+                                const filterIdx = (ky + 1) * 3 + (kx + 1);
+                                
+                                gx += gray * sobelX[filterIdx];
+                                gy += gray * sobelY[filterIdx];
+                            }
+                        }
+                        
+                        const magnitude = Math.sqrt(gx * gx + gy * gy);
+                        edges[y * width + x] = magnitude > 50 ? 255 : 0;
+                    }
+                }
+                
+                return { data: edges, width, height };
+            }
+            
+            detectCorners(edges) {
+                // 간단한 코너 검출 (실제로는 Harris Corner Detection 사용 권장)
+                const corners = [];
+                const width = edges.width;
+                const height = edges.height;
+                const data = edges.data;
+                
+                // 이미지를 격자로 나누어 각 영역에서 엣지가 많이 교차하는 점 찾기
+                const gridSize = 50;
+                
+                for (let y = gridSize; y < height - gridSize; y += gridSize) {
+                    for (let x = gridSize; x < width - gridSize; x += gridSize) {
+                        let edgeCount = 0;
+                        
+                        // 주변 영역의 엣지 밀도 계산
+                        for (let dy = -10; dy <= 10; dy++) {
+                            for (let dx = -10; dx <= 10; dx++) {
+                                if (data[(y + dy) * width + (x + dx)] > 128) {
+                                    edgeCount++;
+                                }
+                            }
+                        }
+                        
+                        // 일정 임계값을 넘으면 코너로 판단
+                        if (edgeCount > 20) {
+                            corners.push({ 
+                                x: x, 
+                                y: y, 
+                                strength: edgeCount,
+                                realX: (x / width) * 4, // 가상의 실제 좌표 (4m 기준)
+                                realY: (y / height) * 3  // 가상의 실제 좌표 (3m 기준)
+                            });
+                        }
+                    }
+                }
+                
+                // 가장 강한 코너 4개만 선택 (방의 4개 모서리)
+                corners.sort((a, b) => b.strength - a.strength);
+                return corners.slice(0, 4);
+            }
+            
+            displayEdgeDetection(edges) {
+                this.edgeCanvas.width = Math.min(300, edges.width);
+                this.edgeCanvas.height = Math.min(200, edges.height);
+                
+                const scaleX = this.edgeCanvas.width / edges.width;
+                const scaleY = this.edgeCanvas.height / edges.height;
+                
+                const imageData = this.edgeCtx.createImageData(this.edgeCanvas.width, this.edgeCanvas.height);
+                
+                for (let y = 0; y < this.edgeCanvas.height; y++) {
+                    for (let x = 0; x < this.edgeCanvas.width; x++) {
+                        const srcX = Math.floor(x / scaleX);
+                        const srcY = Math.floor(y / scaleY);
+                        const srcIdx = srcY * edges.width + srcX;
+                        const destIdx = (y * this.edgeCanvas.width + x) * 4;
+                        
+                        const value = edges.data[srcIdx] || 0;
+                        imageData.data[destIdx] = value;     // R
+                        imageData.data[destIdx + 1] = value; // G
+                        imageData.data[destIdx + 2] = value; // B
+                        imageData.data[destIdx + 3] = 255;   // A
+                    }
+                }
+                
+                this.edgeCtx.putImageData(imageData, 0, 0);
+                
+                // 검출된 코너 표시
+                this.edgeCtx.fillStyle = '#ff6b6b';
+                this.detectedCorners.forEach(corner => {
+                    this.edgeCtx.beginPath();
+                    this.edgeCtx.arc(corner.x * scaleX, corner.y * scaleY, 3, 0, 2 * Math.PI);
+                    this.edgeCtx.fill();
+                });
+            }
+            
+            displayCorners(corners) {
+                this.cornerList.innerHTML = '';
+                
+                corners.forEach((corner, index) => {
+                    const cornerItem = document.createElement('div');
+                    cornerItem.className = 'corner-item';
+                    cornerItem.innerHTML = `
+                        <div>모서리 ${index + 1}</div>
+                        <div>${corner.realX.toFixed(1)}m, ${corner.realY.toFixed(1)}m</div>
+                    `;
+                    this.cornerList.appendChild(cornerItem);
+                });
+            }
+            
+            applyPhotoResults() {
+                if (this.detectedCorners.length < 4) {
+                    alert('4개의 모서리가 필요합니다. 다시 촬영해주세요.');
+                    return;
+                }
+                
+                // 검출된 코너들로부터 방 크기 계산
+                const corners = this.detectedCorners;
+                
+                // 가장 왼쪽, 오른쪽, 위쪽, 아래쪽 코너 찾기
+                const leftMost = corners.reduce((a, b) => a.realX < b.realX ? a : b);
+                const rightMost = corners.reduce((a, b) => a.realX > b.realX ? a : b);
+                const topMost = corners.reduce((a, b) => a.realY < b.realY ? a : b);
+                const bottomMost = corners.reduce((a, b) => a.realY > b.realY ? a : b);
+                
+                const width = Math.abs(rightMost.realX - leftMost.realX);
+                const height = Math.abs(bottomMost.realY - topMost.realY);
+                const area = width * height;
+                const perimeter = 2 * (width + height);
+                
+                // 평면도에 적용
+                this.drawPhotoBasedRoom(width, height);
+                this.updateRoomInfo(width, height, area, perimeter);
+                
+                alert(`사진 분석 완료!\n가로: ${width.toFixed(1)}m\n세로: ${height.toFixed(1)}m\n면적: ${area.toFixed(1)}㎡`);
+            }
+            
+            drawPhotoBasedRoom(width, height) {
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                
+                // 격자 그리기
+                this.drawGrid();
+                
+                // 중앙에 방 그리기
+                const centerX = this.canvas.width / 2;
+                const centerY = this.canvas.height / 2;
+                const rectWidth = width * this.scale;
+                const rectHeight = height * this.scale;
+                
+                const x = centerX - rectWidth / 2;
+                const y = centerY - rectHeight / 2;
+                
+                // 방 외곽선
+                this.ctx.strokeStyle = '#667eea';
+                this.ctx.lineWidth = 3;
+                this.ctx.strokeRect(x, y, rectWidth, rectHeight);
+                
+                // 모서리 점들
+                this.ctx.fillStyle = '#ff6b6b';
+                const corners = [
+                    { x: x, y: y },
+                    { x: x + rectWidth, y: y },
+                    { x: x + rectWidth, y: y + rectHeight },
+                    { x: x, y: y + rectHeight }
+                ];
+                
+                corners.forEach(corner => {
+                    this.ctx.beginPath();
+                    this.ctx.arc(corner.x, corner.y, 5, 0, 2 * Math.PI);
+                    this.ctx.fill();
+                });
+                
+                // 중앙에 텍스트
+                this.ctx.fillStyle = '#333';
+                this.ctx.font = 'bold 14px sans-serif';
+                this.ctx.textAlign = 'center';
+                this.ctx.fillText('📸 사진 분석 결과', centerX, centerY - 10);
+                this.ctx.font = '12px sans-serif';
+                this.ctx.fillText(`${width.toFixed(1)}m × ${height.toFixed(1)}m`, centerX, centerY + 10);
+            }
+            
+            async toggleWalking() {
+                if (!this.isScanning) {
+                    const hasPermission = await this.requestPermissions();
+                    if (!hasPermission) return;
+                    this.startWalking();
+                } else {
+                    this.stopWalking();
+                }
+            }
+            
+            async requestPermissions() {
+                try {
+                    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                        const permission = await DeviceOrientationEvent.requestPermission();
+                        if (permission !== 'granted') {
+                            alert('센서 권한이 필요합니다.');
+                            return false;
+                        }
+                    }
+                    
+                    if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+                        const permission = await DeviceMotionEvent.requestPermission();
+                        if (permission !== 'granted') {
+                            alert('모션 센서 권한이 필요합니다.');
+                            return false;
+                        }
+                    }
+                    
+                    return true;
+                } catch (error) {
+                    console.log('권한 요청 실패:', error);
+                    return true;
+                }
+            }
+            
+            startWalking() {
+                this.isScanning = true;
+                this.startWalkingBtn.textContent = '정지';
+                this.startWalkingBtn.classList.remove('btn-primary');
+                this.startWalkingBtn.classList.add('btn-secondary');
+                this.recordingIndicator.style.display = 'block';
+                
+                // 센서 이벤트 등록
+                window.addEventListener('deviceorientation', this.handleOrientation.bind(this));
+                window.addEventListener('devicemotion', this.handleMotion.bind(this));
+                
+                this.path = [{ ...this.currentPosition }];
+                this.stepCount = 0;
+                this.totalDistance = 0;
+            }
+            
+            stopWalking() {
+                this.isScanning = false;
+                this.startWalkingBtn.textContent = '🚶 걸어다니기 시작';
+                this.startWalkingBtn.classList.remove('btn-secondary');
+                this.startWalkingBtn.classList.add('btn-primary');
+                this.recordingIndicator.style.display = 'none';
+                
+                window.removeEventListener('deviceorientation', this.handleOrientation.bind(this));
+                window.removeEventListener('devicemotion', this.handleMotion.bind(this));
+                
+                this.calculateRoomDimensions();
+            }
+            
+            handleOrientation(event) {
+                if (!this.isScanning) return;
+                this.orientation = event.alpha || 0;
+                this.orientationDisplay.textContent = Math.round(this.orientation) + '°';
+            }
+            
+            handleMotion(event) {
+                if (!this.isScanning) return;
+                
+                const acceleration = event.accelerationIncludingGravity;
+                if (!acceleration) return;
+                
+                const totalAcceleration = Math.sqrt(
+                    Math.pow(acceleration.x || 0, 2) +
+                    Math.pow(acceleration.y || 0, 2) +
+                    Math.pow(acceleration.z || 0, 2)
+                );
+                
+                this.accelerationDisplay.textContent = totalAcceleration.toFixed(1);
+                this.detectStep(totalAcceleration);
+            }
+            
+            detectStep(acceleration) {
+                const now = Date.now();
+                if (now - this.lastStepTime < 300) return;
+                
+                if (acceleration > this.stepThreshold) {
+                    this.stepCount++;
+                    this.lastStepTime = now;
+                    this.updatePosition();
+                    this.updateDisplay();
+                    this.drawWalkingRoom();
+                }
+            }
+            
+            updatePosition() {
+                const radians = (this.orientation * Math.PI) / 180;
+                const deltaX = Math.sin(radians) * this.stepLength * this.scale;
+                const deltaY = -Math.cos(radians) * this.stepLength * this.scale;
+                
+                this.currentPosition.x += deltaX;
+                this.currentPosition.y += deltaY;
+                
+                this.currentPosition.x = Math.max(10, Math.min(290, this.currentPosition.x));
+                this.currentPosition.y = Math.max(10, Math.min(290, this.currentPosition.y));
+                
+                this.path.push({ ...this.currentPosition });
+                this.totalDistance += this.stepLength;
+            }
+            
+            updateDisplay() {
+                this.stepCountDisplay.textContent = this.stepCount;
+                this.distanceDisplay.textContent = this.totalDistance.toFixed(1) + 'm';
+            }
+            
+            drawWalkingRoom() {
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                this.drawGrid();
+                
+                // 경로 그리기
+                if (this.path.length > 1) {
+                    this.ctx.strokeStyle = '#4ecdc4';
+                    this.ctx.lineWidth = 3;
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(this.path[0].x, this.path[0].y);
+                    
+                    for (let i = 1; i < this.path.length; i++) {
+                        this.ctx.lineTo(this.path[i].x, this.path[i].y);
+                    }
+                    this.ctx.stroke();
+                }
+                
+                // 시작점
+                if (this.path.length > 0) {
+                    this.ctx.fillStyle = '#ff6b6b';
+                    this.ctx.beginPath();
+                    this.ctx.arc(this.path[0].x, this.path[0].y, 4, 0, 2 * Math.PI);
+                    this.ctx.fill();
+                }
+                
+                // 현재 위치
+                this.ctx.fillStyle = '#667eea';
+                this.ctx.beginPath();
+                this.ctx.arc(this.currentPosition.x, this.currentPosition.y, 6, 0, 2 * Math.PI);
+                this.ctx.fill();
+                
+                // 방향 표시
+                const radians = (this.orientation * Math.PI) / 180;
+                const arrowLength = 15;
+                const endX = this.currentPosition.x + Math.sin(radians) * arrowLength;
+                const endY = this.currentPosition.y - Math.cos(radians) * arrowLength;
+                
+                this.ctx.strokeStyle = '#667eea';
+                this.ctx.lineWidth = 2;
+                this.ctx.beginPath();
+                this.ctx.moveTo(this.currentPosition.x, this.currentPosition.y);
+                this.ctx.lineTo(endX, endY);
+                this.ctx.stroke();
+            }
+            
+            calculateRoomDimensions() {
+                if (this.path.length < 3) return;
+                
+                let minX = Math.min(...this.path.map(p => p.x));
+                let maxX = Math.max(...this.path.map(p => p.x));
+                let minY = Math.min(...this.path.map(p => p.y));
+                let maxY = Math.max(...this.path.map(p => p.y));
+                
+                const width = (maxX - minX) / this.scale;
+                const height = (maxY - minY) / this.scale;
+                const area = width * height;
+                const perimeter = this.totalDistance;
+                
+                this.updateRoomInfo(width, height, area, perimeter);
+                this.drawRoomOutline(minX, minY, maxX, maxY);
+            }
+            
+            updateRoomInfo(width, height, area, perimeter) {
+                this.roomWidthDisplay.textContent = width.toFixed(1) + 'm';
+                this.roomHeightDisplay.textContent = height.toFixed(1) + 'm';
+                this.roomAreaDisplay.textContent = area.toFixed(1) + '㎡';
+                this.roomPerimeterDisplay.textContent = perimeter.toFixed(1) + 'm';
+            }
+            
+            drawRoomOutline(minX, minY, maxX, maxY) {
+                this.ctx.strokeStyle = '#ff6b6b';
+                this.ctx.lineWidth = 2;
+                this.ctx.setLineDash([5, 5]);
+                this.ctx.strokeRect(minX, minY, maxX - minX, maxY - minY);
+                this.ctx.setLineDash([]);
+            }
+            
+            drawGrid() {
+                this.ctx.strokeStyle = '#f0f0f0';
+                this.ctx.lineWidth = 1;
+                for (let i = 0; i <= 300; i += 25) {
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(i, 0);
+                    this.ctx.lineTo(i, 300);
+                    this.ctx.stroke();
+                    
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(0, i);
+                    this.ctx.lineTo(300, i);
+                    this.ctx.stroke();
+                }
+            }
+            
+            drawInitialRoom() {
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                this.drawGrid();
+                
+                // 시작점 표시
+                this.ctx.fillStyle = '#ff6b6b';
+                this.ctx.beginPath();
+                this.ctx.arc(this.currentPosition.x, this.currentPosition.y, 5, 0, 2 * Math.PI);
+                this.ctx.fill();
+                
+                // 안내 텍스트
+                this.ctx.fillStyle = '#999';
+                this.ctx.font = '14px sans-serif';
+                this.ctx.textAlign = 'center';
+                this.ctx.fillText('방법을 선택하세요', 150, 150);
+            }
+            
+            reset() {
+                // 스캐닝 중지
+                if (this.isScanning) {
+                    this.stopWalking();
+                }
+                
+                // 카메라 스트림 정지
+                if (this.stream) {
+                    this.stream.getTracks().forEach(track => track.stop());
+                }
+                
+                // 모든 데이터 초기화
+                this.stepCount = 0;
+                this.totalDistance = 0;
+                this.currentPosition = { x: 150, y: 150 };
+                this.path = [];
+                this.orientation = 0;
+                this.imageData = null;
+                this.detectedCorners = [];
+                
+                // UI 초기화
+                this.startCameraBtn.textContent = '카메라 시작';
+                this.startCameraBtn.disabled = false;
+                this.captureBtn.disabled = true;
+                this.analyzeBtn.disabled = true;
+                this.applyPhotoBtn.disabled = true;
+                
+                this.videoElement.style.display = 'block';
+                this.capturedImage.style.display = 'none';
+                this.analysisSection.classList.remove('active');
+                
+                // 디스플레이 초기화
+                this.orientationDisplay.textContent = '0°';
+                this.accelerationDisplay.textContent = '0.0';
+                this.stepCountDisplay.textContent = '0';
+                this.distanceDisplay.textContent = '0.0m';
+                
+                this.roomWidthDisplay.textContent = '0.0m';
+                this.roomHeightDisplay.textContent = '0.0m';
+                this.roomAreaDisplay.textContent = '0.0㎡';
+                this.roomPerimeterDisplay.textContent = '0.0m';
+                
+                this.cornerList.innerHTML = '';
+                this.edgeCtx.clearRect(0, 0, this.edgeCanvas.width, this.edgeCanvas.height);
+                
+                this.drawInitialRoom();
+            }
+        }
+        
+        // 앱 초기화
+        document.addEventListener('DOMContentLoaded', () => {
+            new HybridRoomScanner();
+        });
+    </script>
+</body>
+</html>
