@@ -3,978 +3,405 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>동영상 룸 스캐너 (Video SLAM)</title>
+    <title>동영상 룸 스캐너 - 디버그</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            color: white;
-            overflow-x: hidden;
-        }
-        
-        .container {
+            font-family: Arial, sans-serif;
             max-width: 400px;
             margin: 0 auto;
             padding: 20px;
+            background: #f0f0f0;
         }
         
-        .header {
-            text-align: center;
-            margin-bottom: 25px;
-        }
-        
-        .header h1 {
-            font-size: 24px;
-            margin-bottom: 8px;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
-        }
-        
-        .subtitle {
-            background: linear-gradient(45deg, #f39c12, #e67e22);
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: bold;
-            display: inline-block;
-        }
-        
-        .recording-status {
-            background: rgba(231, 76, 60, 0.2);
-            border: 2px solid #e74c3c;
-            border-radius: 15px;
-            padding: 15px;
-            margin-bottom: 20px;
-            text-align: center;
-            transition: all 0.3s ease;
-        }
-        
-        .recording-status.recording {
-            background: rgba(46, 204, 113, 0.3);
-            border-color: #2ecc71;
-            animation: pulse 2s infinite;
-        }
-        
-        .recording-status.processing {
-            background: rgba(243, 156, 18, 0.3);
-            border-color: #f39c12;
-        }
-        
-        @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(46, 204, 113, 0.7); }
-            70% { box-shadow: 0 0 0 10px rgba(46, 204, 113, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(46, 204, 113, 0); }
-        }
-        
-        .video-section {
-            background: rgba(0,0,0,0.8);
-            border-radius: 20px;
+        .container {
+            background: white;
             padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            text-align: center;
+            color: #333;
             margin-bottom: 20px;
-            border: 1px solid rgba(255,255,255,0.2);
         }
         
-        .video-controls {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 15px;
-        }
-        
-        .recording-timer {
-            background: rgba(231, 76, 60, 0.3);
-            padding: 8px 12px;
-            border-radius: 20px;
-            font-weight: bold;
-            font-size: 18px;
-            min-width: 80px;
-            text-align: center;
-        }
-        
-        .recording-timer.active {
-            background: rgba(46, 204, 113, 0.3);
-            color: #2ecc71;
-        }
-        
-        .quality-selector {
-            background: rgba(255,255,255,0.1);
-            border: none;
-            border-radius: 8px;
-            padding: 6px 10px;
-            color: white;
-            font-size: 12px;
-        }
-        
-        #videoElement {
-            width: 100%;
-            border-radius: 15px;
-            margin-bottom: 15px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-        }
-        
-        .recording-overlay {
-            position: relative;
-            margin-bottom: 15px;
-        }
-        
-        .slam-indicators {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            right: 10px;
-            display: flex;
-            justify-content: space-between;
-            pointer-events: none;
-        }
-        
-        .slam-indicator {
-            background: rgba(0,0,0,0.7);
-            padding: 4px 8px;
-            border-radius: 8px;
-            font-size: 11px;
-            font-weight: bold;
-        }
-        
-        .slam-indicator.good {
-            color: #2ecc71;
-        }
-        
-        .slam-indicator.warning {
-            color: #f39c12;
-        }
-        
-        .slam-indicator.error {
-            color: #e74c3c;
-        }
-        
-        .feature-points {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-        }
-        
-        .feature-point {
-            position: absolute;
-            width: 4px;
-            height: 4px;
-            background: #00ff00;
-            border-radius: 50%;
-            animation: blink 1s infinite;
-        }
-        
-        @keyframes blink {
-            0%, 50% { opacity: 1; }
-            51%, 100% { opacity: 0.3; }
-        }
-        
-        .motion-analysis {
-            background: rgba(255,255,255,0.1);
-            border-radius: 12px;
+        .status {
             padding: 15px;
-            margin-bottom: 15px;
-        }
-        
-        .motion-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            gap: 10px;
-            margin-bottom: 10px;
-        }
-        
-        .motion-item {
-            text-align: center;
-            padding: 8px;
-            background: rgba(255,255,255,0.1);
+            margin: 15px 0;
             border-radius: 8px;
-        }
-        
-        .motion-value {
-            font-size: 16px;
             font-weight: bold;
-            color: #3498db;
+            text-align: center;
         }
         
-        .motion-label {
-            font-size: 10px;
-            opacity: 0.8;
+        .status.info {
+            background: #e3f2fd;
+            color: #1976d2;
+            border: 2px solid #2196f3;
         }
         
-        .path-preview {
-            background: rgba(255,255,255,0.1);
-            border-radius: 8px;
-            padding: 10px;
-            height: 60px;
-            position: relative;
-            overflow: hidden;
+        .status.success {
+            background: #e8f5e8;
+            color: #2e7d32;
+            border: 2px solid #4caf50;
         }
         
-        .path-canvas {
+        .status.error {
+            background: #ffebee;
+            color: #c62828;
+            border: 2px solid #f44336;
+        }
+        
+        video {
             width: 100%;
-            height: 100%;
-            border-radius: 4px;
-            background: rgba(0,0,0,0.3);
+            border-radius: 8px;
+            margin: 10px 0;
+            background: #000;
         }
         
-        .controls {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            margin-bottom: 15px;
-        }
-        
-        .btn {
-            padding: 15px 20px;
+        button {
+            width: 100%;
+            padding: 15px;
+            margin: 10px 0;
             border: none;
-            border-radius: 12px;
+            border-radius: 8px;
             font-size: 16px;
             font-weight: bold;
             cursor: pointer;
-            transition: all 0.3s ease;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+            transition: all 0.3s;
         }
         
-        .btn-record {
-            background: linear-gradient(45deg, #e74c3c, #c0392b);
+        .btn-primary {
+            background: #2196f3;
             color: white;
-            box-shadow: 0 4px 15px rgba(231,76,60,0.4);
         }
         
-        .btn-record.recording {
-            background: linear-gradient(45deg, #2ecc71, #27ae60);
-            box-shadow: 0 4px 15px rgba(46,204,113,0.4);
+        .btn-primary:hover {
+            background: #1976d2;
         }
         
-        .btn-process {
-            background: linear-gradient(45deg, #f39c12, #e67e22);
+        .btn-success {
+            background: #4caf50;
             color: white;
-            box-shadow: 0 4px 15px rgba(243,156,18,0.4);
         }
         
-        .btn:hover {
-            transform: translateY(-2px);
+        .btn-success:hover {
+            background: #388e3c;
         }
         
-        .btn:disabled {
-            opacity: 0.5;
+        .btn-danger {
+            background: #f44336;
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background: #d32f2f;
+        }
+        
+        button:disabled {
+            background: #ccc;
             cursor: not-allowed;
-            transform: none !important;
         }
         
-        .processing-section {
-            background: rgba(255,255,255,0.1);
-            border-radius: 15px;
-            padding: 20px;
-            margin-bottom: 20px;
-            display: none;
-        }
-        
-        .processing-section.active {
-            display: block;
-        }
-        
-        .processing-steps {
-            list-style: none;
-        }
-        
-        .processing-step {
-            display: flex;
-            align-items: center;
-            margin-bottom: 12px;
-            padding: 8px;
+        .debug-info {
+            background: #f5f5f5;
+            padding: 15px;
             border-radius: 8px;
-            background: rgba(255,255,255,0.05);
-        }
-        
-        .step-icon {
-            width: 24px;
-            height: 24px;
-            border-radius: 50%;
-            background: rgba(149, 165, 166, 0.3);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-right: 12px;
-            font-size: 12px;
-        }
-        
-        .step-icon.processing {
-            background: #f39c12;
-            animation: spin 1s linear infinite;
-        }
-        
-        .step-icon.completed {
-            background: #2ecc71;
-        }
-        
-        @keyframes spin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-        }
-        
-        .progress-bar {
-            background: rgba(255,255,255,0.2);
-            border-radius: 10px;
-            height: 8px;
             margin: 15px 0;
-            overflow: hidden;
-        }
-        
-        .progress-fill {
-            background: linear-gradient(90deg, #3498db, #2ecc71);
-            height: 100%;
-            border-radius: 10px;
-            transition: width 0.3s ease;
-            width: 0%;
-        }
-        
-        .results-section {
-            background: rgba(255,255,255,0.95);
-            border-radius: 20px;
-            padding: 20px;
-            margin-bottom: 20px;
-            color: #333;
-            display: none;
-        }
-        
-        .results-section.active {
-            display: block;
-        }
-        
-        .results-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 15px;
-        }
-        
-        .confidence-badge {
-            background: #2ecc71;
-            color: white;
-            padding: 4px 12px;
-            border-radius: 12px;
+            font-family: monospace;
             font-size: 12px;
-            font-weight: bold;
+            max-height: 200px;
+            overflow-y: auto;
         }
         
-        .confidence-badge.medium {
-            background: #f39c12;
-        }
-        
-        .confidence-badge.low {
-            background: #e74c3c;
-        }
-        
-        #floorplanCanvas {
-            border: 2px solid #ddd;
-            border-radius: 12px;
-            background: white;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-            width: 100%;
-            margin-bottom: 15px;
-        }
-        
-        .room-stats {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-        }
-        
-        .stat-card {
-            background: rgba(0,0,0,0.05);
-            padding: 12px;
-            border-radius: 10px;
+        .timer {
             text-align: center;
-        }
-        
-        .stat-value {
-            font-size: 20px;
+            font-size: 24px;
             font-weight: bold;
-            color: #2c3e50;
-        }
-        
-        .stat-label {
-            font-size: 12px;
-            opacity: 0.7;
-            margin-top: 4px;
-        }
-        
-        .instructions {
-            background: rgba(255,255,255,0.1);
-            border-radius: 15px;
-            padding: 20px;
-        }
-        
-        .instructions h3 {
-            color: #f39c12;
-            margin-bottom: 15px;
-            font-size: 16px;
-        }
-        
-        .step {
-            margin-bottom: 10px;
-            padding-left: 16px;
-            position: relative;
-            font-size: 13px;
-            line-height: 1.4;
-        }
-        
-        .step::before {
-            content: "▶";
-            position: absolute;
-            left: 0;
-            color: #f39c12;
-            font-size: 10px;
-        }
-        
-        .pro-tip {
-            background: rgba(46, 204, 113, 0.2);
-            border: 1px solid #2ecc71;
-            border-radius: 10px;
-            padding: 12px;
-            margin-top: 15px;
-        }
-        
-        .pro-tip-title {
-            font-weight: bold;
-            color: #2ecc71;
-            margin-bottom: 5px;
+            color: #f44336;
+            margin: 10px 0;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="header">
-            <h1>🎥 동영상 룸 스캐너</h1>
-            <div class="subtitle">걸어다니며 녹화 → 자동 평면도 생성</div>
+        <h1>🎥 동영상 룸 스캐너</h1>
+        
+        <div id="status" class="status info">
+            시작 준비 중...
         </div>
         
-        <div class="recording-status" id="recordingStatus">
-            <strong>준비 상태</strong><br>
-            녹화 버튼을 눌러 방을 촬영하세요
-        </div>
+        <video id="video" autoplay playsinline muted style="display: none;"></video>
         
-        <div class="video-section">
-            <div class="video-controls">
-                <div class="recording-timer" id="recordingTimer">00:00</div>
-                <select class="quality-selector" id="qualitySelector">
-                    <option value="4k">4K (Ultra)</option>
-                    <option value="1080p" selected>1080p (High)</option>
-                    <option value="720p">720p (Fast)</option>
-                </select>
-            </div>
-            
-            <div class="recording-overlay">
-                <video id="videoElement" autoplay playsinline muted></video>
-                
-                <div class="slam-indicators" id="slamIndicators">
-                    <div class="slam-indicator good" id="trackingStatus">추적: 양호</div>
-                    <div class="slam-indicator good" id="featuresStatus">특징점: 847</div>
-                    <div class="slam-indicator good" id="motionStatus">움직임: 안정</div>
-                </div>
-                
-                <div class="feature-points" id="featurePoints"></div>
-            </div>
-            
-            <div class="motion-analysis">
-                <div class="motion-grid">
-                    <div class="motion-item">
-                        <div class="motion-value" id="distanceTraveled">0.0m</div>
-                        <div class="motion-label">이동거리</div>
-                    </div>
-                    <div class="motion-item">
-                        <div class="motion-value" id="currentSpeed">0.0</div>
-                        <div class="motion-label">속도 km/h</div>
-                    </div>
-                    <div class="motion-item">
-                        <div class="motion-value" id="roomCount">0</div>
-                        <div class="motion-label">인식된 방</div>
-                    </div>
-                </div>
-                
-                <div class="path-preview">
-                    <canvas id="pathCanvas" class="path-canvas" width="300" height="50"></canvas>
-                </div>
-            </div>
-            
-            <div class="controls">
-                <button class="btn btn-record" id="recordBtn">🔴 녹화 시작</button>
-                <button class="btn btn-process" id="processBtn" disabled>🔄 평면도 생성</button>
-            </div>
-        </div>
+        <div id="timer" class="timer" style="display: none;">00:00</div>
         
-        <div class="processing-section" id="processingSection">
-            <h3>🔄 동영상 분석 중...</h3>
-            
-            <div class="progress-bar">
-                <div class="progress-fill" id="progressFill"></div>
-            </div>
-            
-            <ul class="processing-steps">
-                <li class="processing-step">
-                    <div class="step-icon" id="step1Icon">1</div>
-                    <div>프레임 추출 및 전처리</div>
-                </li>
-                <li class="processing-step">
-                    <div class="step-icon" id="step2Icon">2</div>
-                    <div>특징점 매칭 및 카메라 추적</div>
-                </li>
-                <li class="processing-step">
-                    <div class="step-icon" id="step3Icon">3</div>
-                    <div>3D 포인트 클라우드 생성</div>
-                </li>
-                <li class="processing-step">
-                    <div class="step-icon" id="step4Icon">4</div>
-                    <div>평면도 추출 및 최적화</div>
-                </li>
-                <li class="processing-step">
-                    <div class="step-icon" id="step5Icon">5</div>
-                    <div>방 크기 계산 및 검증</div>
-                </li>
-            </ul>
-        </div>
+        <button id="startBtn" class="btn-primary">📹 카메라 시작</button>
+        <button id="recordBtn" class="btn-success" disabled>🔴 녹화 시작</button>
+        <button id="stopBtn" class="btn-danger" disabled>⏹️ 녹화 중지</button>
+        <button id="testBtn" class="btn-primary">🧪 기능 테스트</button>
         
-        <div class="results-section" id="resultsSection">
-            <div class="results-header">
-                <h3>📐 생성된 평면도</h3>
-                <div class="confidence-badge" id="confidenceBadge">신뢰도: 92%</div>
-            </div>
-            
-            <canvas id="floorplanCanvas" width="340" height="250"></canvas>
-            
-            <div class="room-stats">
-                <div class="stat-card">
-                    <div class="stat-value" id="totalArea">0.0㎡</div>
-                    <div class="stat-label">총 면적</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="recordingDuration">0분</div>
-                    <div class="stat-label">촬영 시간</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="processingTime">0초</div>
-                    <div class="stat-label">처리 시간</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="frameCount">0</div>
-                    <div class="stat-label">분석 프레임</div>
-                </div>
-            </div>
-            
-            <button class="btn btn-process" style="width: 100%; margin-top: 15px;" id="exportBtn">
-                📤 평면도 내보내기
-            </button>
-        </div>
-        
-        <div class="instructions">
-            <h3>🎬 동영상 촬영 가이드</h3>
-            
-            <div class="step">카메라 버튼을 눌러 녹화를 시작하세요</div>
-            <div class="step">방 한쪽 모서리에서 시작하여 천천히 걸어다니세요</div>
-            <div class="step">벽면을 따라 시계방향으로 이동하세요</div>
-            <div class="step">바닥과 천장이 잘 보이도록 각도를 조절하세요</div>
-            <div class="step">다른 방으로 이동할 때도 계속 녹화하세요</div>
-            <div class="step">모든 공간을 돌았으면 녹화를 중지하세요</div>
-            
-            <div class="pro-tip">
-                <div class="pro-tip-title">💡 Pro Tips</div>
-                <div>• 일정한 속도로 걸으세요 (1m/s 권장)</div>
-                <div>• 손떨림을 최소화하세요</div>
-                <div>• 조명이 좋은 시간대에 촬영하세요</div>
-                <div>• 특징점이 많은 벽면을 우선 촬영하세요</div>
-            </div>
+        <div class="debug-info" id="debugInfo">
+            === 디버그 정보 ===<br>
+            페이지 로딩 완료...<br>
         </div>
     </div>
 
     <script>
-        class VideoRoomScanner {
-            constructor() {
-                this.isRecording = false;
-                this.mediaRecorder = null;
-                this.recordedChunks = [];
-                this.startTime = null;
-                this.stream = null;
-                
-                // SLAM 시뮬레이션 데이터
-                this.slamData = {
-                    featurePoints: [],
-                    cameraPath: [],
-                    distanceTraveled: 0,
-                    currentSpeed: 0,
-                    roomCount: 0,
-                    trackingQuality: 'good'
-                };
-                
-                // 타이머
-                this.recordingInterval = null;
-                this.slamUpdateInterval = null;
-                
-                this.initializeElements();
-                this.setupEventListeners();
-                this.startCamera();
-            }
+        // 전역 변수로 디버그 쉽게 하기
+        let video, startBtn, recordBtn, stopBtn, testBtn, status, debugInfo, timer;
+        let stream = null;
+        let mediaRecorder = null;
+        let isRecording = false;
+        let recordingStartTime = null;
+        let timerInterval = null;
+        
+        // 디버그 로그 함수
+        function log(message) {
+            console.log(message);
+            const now = new Date().toLocaleTimeString();
+            debugInfo.innerHTML += `[${now}] ${message}<br>`;
+            debugInfo.scrollTop = debugInfo.scrollHeight;
+        }
+        
+        // 상태 업데이트 함수
+        function updateStatus(message, type = 'info') {
+            status.textContent = message;
+            status.className = `status ${type}`;
+            log(`상태: ${message}`);
+        }
+        
+        // 페이지 로드 완료 시 초기화
+        document.addEventListener('DOMContentLoaded', function() {
+            log('DOM 로딩 완료');
             
-            initializeElements() {
-                // 컨트롤 요소들
-                this.recordBtn = document.getElementById('recordBtn');
-                this.processBtn = document.getElementById('processBtn');
-                this.exportBtn = document.getElementById('exportBtn');
-                
-                // 비디오 및 상태
-                this.videoElement = document.getElementById('videoElement');
-                this.recordingStatus = document.getElementById('recordingStatus');
-                this.recordingTimer = document.getElementById('recordingTimer');
-                this.qualitySelector = document.getElementById('qualitySelector');
-                
-                // SLAM 표시기
-                this.trackingStatus = document.getElementById('trackingStatus');
-                this.featuresStatus = document.getElementById('featuresStatus');
-                this.motionStatus = document.getElementById('motionStatus');
-                this.featurePoints = document.getElementById('featurePoints');
-                
-                // 모션 분석
-                this.distanceTraveled = document.getElementById('distanceTraveled');
-                this.currentSpeed = document.getElementById('currentSpeed');
-                this.roomCount = document.getElementById('roomCount');
-                this.pathCanvas = document.getElementById('pathCanvas');
-                this.pathCtx = this.pathCanvas.getContext('2d');
-                
-                // 처리 섹션
-                this.processingSection = document.getElementById('processingSection');
-                this.progressFill = document.getElementById('progressFill');
-                this.stepIcons = [
-                    document.getElementById('step1Icon'),
-                    document.getElementById('step2Icon'),
-                    document.getElementById('step3Icon'),
-                    document.getElementById('step4Icon'),
-                    document.getElementById('step5Icon')
-                ];
-                
-                // 결과 섹션
-                this.resultsSection = document.getElementById('resultsSection');
-                this.confidenceBadge = document.getElementById('confidenceBadge');
-                this.floorplanCanvas = document.getElementById('floorplanCanvas');
-                this.floorplanCtx = this.floorplanCanvas.getContext('2d');
-                
-                // 통계
-                this.totalArea = document.getElementById('totalArea');
-                this.recordingDuration = document.getElementById('recordingDuration');
-                this.processingTime = document.getElementById('processingTime');
-                this.frameCount = document.getElementById('frameCount');
-            }
+            // 요소들 가져오기
+            video = document.getElementById('video');
+            startBtn = document.getElementById('startBtn');
+            recordBtn = document.getElementById('recordBtn');
+            stopBtn = document.getElementById('stopBtn');
+            testBtn = document.getElementById('testBtn');
+            status = document.getElementById('status');
+            debugInfo = document.getElementById('debugInfo');
+            timer = document.getElementById('timer');
             
-            setupEventListeners() {
-                this.recordBtn.addEventListener('click', () => this.toggleRecording());
-                this.processBtn.addEventListener('click', () => this.processVideo());
-                this.exportBtn.addEventListener('click', () => this.exportResults());
-                
-                this.qualitySelector.addEventListener('change', () => this.updateQuality());
-                
-                // 디바이스 센서 (시뮬레이션)
-                if (window.DeviceMotionEvent) {
-                    window.addEventListener('devicemotion', (event) => this.handleMotion(event));
-                }
-            }
+            log('모든 요소 찾기 완료');
             
-            async startCamera() {
-                try {
-                    // 먼저 카메라 권한 확인
-                    this.updateStatus('카메라 권한 확인 중...', 'processing');
-                    
-                    // 권한 요청
-                    const permissionStatus = await this.requestCameraPermission();
-                    if (!permissionStatus) {
-                        return;
-                    }
-                    
-                    this.updateStatus('카메라 시작 중...', 'processing');
-                    
-                    const quality = this.qualitySelector.value;
-                    const constraints = this.getVideoConstraints(quality);
-                    
-                    this.stream = await navigator.mediaDevices.getUserMedia(constraints);
-                    this.videoElement.srcObject = this.stream;
-                    
-                    // 비디오 로드 완료 대기
-                    this.videoElement.onloadedmetadata = () => {
-                        this.updateStatus('카메라 준비 완료! 녹화를 시작하세요', 'ready');
-                        this.recordBtn.disabled = false;
-                    };
-                    
-                } catch (error) {
-                    console.error('카메라 접근 실패:', error);
-                    this.handleCameraError(error);
-                }
-            }
+            // 브라우저 호환성 체크
+            checkBrowserSupport();
             
-            async requestCameraPermission() {
-                try {
-                    // 권한 상태 확인
-                    if (navigator.permissions) {
-                        const permission = await navigator.permissions.query({ name: 'camera' });
-                        console.log('카메라 권한 상태:', permission.state);
-                        
-                        if (permission.state === 'denied') {
-                            this.showPermissionGuide();
-                            return false;
-                        }
-                    }
-                    
-                    // 테스트 스트림으로 권한 확인
-                    const testStream = await navigator.mediaDevices.getUserMedia({ 
-                        video: { facingMode: 'environment' } 
-                    });
-                    
-                    // 테스트 성공하면 스트림 정지
-                    testStream.getTracks().forEach(track => track.stop());
-                    
-                    return true;
-                    
-                } catch (error) {
-                    console.error('권한 요청 실패:', error);
-                    this.handlePermissionError(error);
-                    return false;
-                }
-            }
+            // 이벤트 리스너 등록
+            startBtn.addEventListener('click', startCamera);
+            recordBtn.addEventListener('click', startRecording);
+            stopBtn.addEventListener('click', stopRecording);
+            testBtn.addEventListener('click', runTests);
             
-            handleCameraError(error) {
-                let errorMessage = '카메라에 접근할 수 없습니다.';
-                let solution = '';
-                
-                switch(error.name) {
-                    case 'NotAllowedError':
-                        errorMessage = '카메라 권한이 거부되었습니다.';
-                        solution = '브라우저 설정에서 카메라 권한을 허용해주세요.';
-                        break;
-                    case 'NotFoundError':
-                        errorMessage = '카메라를 찾을 수 없습니다.';
-                        solution = '카메라가 연결되어 있는지 확인해주세요.';
-                        break;
-                    case 'NotSupportedError':
-                        errorMessage = '브라우저에서 지원하지 않는 기능입니다.';
-                        solution = 'Chrome, Safari, Edge 등 최신 브라우저를 사용해주세요.';
-                        break;
-                    case 'NotReadableError':
-                        errorMessage = '카메라가 다른 앱에서 사용 중입니다.';
-                        solution = '다른 카메라 앱을 종료한 후 다시 시도해주세요.';
-                        break;
-                    default:
-                        solution = 'HTTPS 사이트에서 최신 브라우저로 접속해주세요.';
-                }
-                
-                this.updateStatus(errorMessage, 'error');
-                
-                // 상세한 해결 방법 표시
-                setTimeout(() => {
-                    alert(`${errorMessage}\n\n해결 방법:\n${solution}\n\n현재 URL이 https://로 시작하는지 확인해주세요.`);
-                }, 500);
-            }
+            log('이벤트 리스너 등록 완료');
+            updateStatus('준비 완료! 카메라 시작 버튼을 누르세요');
+        });
+        
+        // 브라우저 호환성 체크
+        function checkBrowserSupport() {
+            log('=== 브라우저 호환성 체크 ===');
+            log(`User Agent: ${navigator.userAgent}`);
+            log(`HTTPS: ${location.protocol === 'https:'}`);
+            log(`MediaDevices: ${!!navigator.mediaDevices}`);
+            log(`getUserMedia: ${!!navigator.mediaDevices?.getUserMedia}`);
+            log(`MediaRecorder: ${typeof MediaRecorder !== 'undefined'}`);
             
-            handlePermissionError(error) {
-                if (error.name === 'NotAllowedError') {
-                    this.showPermissionGuide();
-                } else {
-                    this.handleCameraError(error);
-                }
+            if (typeof MediaRecorder !== 'undefined') {
+                const formats = ['video/webm', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8'];
+                log('지원되는 비디오 포맷:');
+                formats.forEach(format => {
+                    const supported = MediaRecorder.isTypeSupported(format);
+                    log(`  ${format}: ${supported ? '✅' : '❌'}`);
+                });
             }
+        }
+        
+        // 카메라 시작
+        async function startCamera() {
+            log('카메라 시작 시도...');
+            updateStatus('카메라 권한 요청 중...', 'info');
             
-            showPermissionGuide() {
-                const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-                const isAndroid = /Android/.test(navigator.userAgent);
-                
-                let guide = '카메라 권한 허용 방법:\n\n';
-                
-                if (isIOS) {
-                    guide += '📱 iPhone/iPad:\n';
-                    guide += '1. 설정 → Safari → 카메라\n';
-                    guide += '2. "허용" 선택\n';
-                    guide += '3. 페이지 새로고침\n\n';
-                } else if (isAndroid) {
-                    guide += '📱 Android:\n';
-                    guide += '1. 주소창 왼쪽 자물쇠 아이콘 클릭\n';
-                    guide += '2. 카메라 → 허용\n';
-                    guide += '3. 페이지 새로고침\n\n';
-                } else {
-                    guide += '💻 PC:\n';
-                    guide += '1. 주소창 카메라 아이콘 클릭\n';
-                    guide += '2. "항상 허용" 선택\n';
-                    guide += '3. 페이지 새로고침\n\n';
-                }
-                
-                guide += '⚠️ 중요: HTTPS 사이트에서만 작동합니다!';
-                
-                alert(guide);
-                
-                this.updateStatus('카메라 권한을 허용한 후 페이지를 새로고침하세요', 'error');
-                
-                // 새로고침 버튼 추가
-                this.recordBtn.textContent = '🔄 새로고침';
-                this.recordBtn.onclick = () => location.reload();
-            }
-            
-            getVideoConstraints(quality) {
+            try {
                 const constraints = {
                     video: {
-                        facingMode: 'environment'
-                    },
-                    audio: false
+                        facingMode: 'environment',
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    }
                 };
                 
-                switch(quality) {
-                    case '4k':
-                        constraints.video.width = { ideal: 3840 };
-                        constraints.video.height = { ideal: 2160 };
-                        break;
-                    case '1080p':
-                        constraints.video.width = { ideal: 1920 };
-                        constraints.video.height = { ideal: 1080 };
-                        break;
-                    case '720p':
-                        constraints.video.width = { ideal: 1280 };
-                        constraints.video.height = { ideal: 720 };
-                        break;
-                }
+                log('getUserMedia 호출...');
+                stream = await navigator.mediaDevices.getUserMedia(constraints);
+                log('스트림 획득 성공');
                 
-                return constraints;
-            }
-            
-            async toggleRecording() {
-                if (!this.stream) {
-                    // 카메라가 아직 시작되지 않았으면 먼저 시작
-                    alert('카메라를 먼저 시작해야 합니다. 자동으로 카메라를 시작합니다.');
-                    await this.startCamera();
-                    return;
-                }
+                video.srcObject = stream;
+                video.style.display = 'block';
                 
-                if (!this.isRecording) {
-                    await this.startRecording();
-                } else {
-                    this.stopRecording();
-                }
-            }
-            
-            constructor() {
-                this.isRecording = false;
-                this.mediaRecorder = null;
-                this.recordedChunks = [];
-                this.startTime = null;
-                this.stream = null;
-                
-                // SLAM 시뮬레이션 데이터
-                this.slamData = {
-                    featurePoints: [],
-                    cameraPath: [],
-                    distanceTraveled: 0,
-                    currentSpeed: 0,
-                    roomCount: 0,
-                    trackingQuality: 'good'
+                video.onloadedmetadata = function() {
+                    log(`비디오 메타데이터 로드: ${video.videoWidth}x${video.videoHeight}`);
+                    updateStatus('카메라 준비 완료!', 'success');
+                    startBtn.disabled = true;
+                    recordBtn.disabled = false;
                 };
                 
-                // 타이머
-                this.recordingInterval = null;
-                this.slamUpdateInterval = null;
+            } catch (error) {
+                log(`카메라 시작 실패: ${error.name} - ${error.message}`);
+                updateStatus(`카메라 오류: ${error.message}`, 'error');
                 
-                this.initializeElements();
-                this.setupEventListeners();
-                
-                // 자동으로 카메라 시작 시도
-                this.autoStartCamera();
-            }
-            
-            async autoStartCamera() {
-                // 페이지 로드 시 자동으로 카메라 시작 시도
-                this.updateStatus('카메라 권한 확인 중...', 'processing');
-                this.recordBtn.disabled = true;
-                this.recordBtn.textContent = '권한 확인 중...';
-                
-                try {
-                    await this.startCamera();
-                } catch (error) {
-                    // 자동 시작 실패 시 수동 시작 버튼으로 변경
-                    this.recordBtn.disabled = false;
-                    this.recordBtn.textContent = '📹 카메라 시작';
-                    this.recordBtn.onclick = () => this.startCamera();
-                    this.updateStatus('카메라 시작 버튼을 눌러주세요', 'ready');
+                if (error.name === 'NotAllowedError') {
+                    alert('카메라 권한을 허용해주세요!\n\n1. 주소창 왼쪽 자물쇠 클릭\n2. 카메라 → 허용\n3. 페이지 새로고침');
                 }
             }
+        }
+        
+        // 녹화 시작
+        async function startRecording() {
+            if (!stream) {
+                alert('먼저 카메라를 시작해주세요');
+                return;
+            }
             
-            async startRecording() {
-                try {
-                    this.recordedChunks = [];
+            log('녹화 시작 시도...');
+            
+            try {
+                // 지원되는 MIME 타입 찾기
+                let mimeType = '';
+                const types = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4'];
+                
+                for (let type of types) {
+                    if (MediaRecorder.isTypeSupported(type)) {
+                        mimeType = type;
+                        break;
+                    }
+                }
+                
+                log(`사용할 MIME 타입: ${mimeType}`);
+                
+                const options = mimeType ? { mimeType } : {};
+                mediaRecorder = new MediaRecorder(stream, options);
+                
+                const chunks = [];
+                
+                mediaRecorder.ondataavailable = function(event) {
+                    if (event.data.size > 0) {
+                        chunks.push(event.data);
+                        log(`데이터 청크 수집: ${event.data.size} bytes`);
+                    }
+                };
+                
+                mediaRecorder.onstart = function() {
+                    log('녹화 시작됨');
+                    isRecording = true;
+                    recordingStartTime = Date.now();
+                    updateStatus('🔴 녹화 중...', 'error');
                     
-                    this.mediaRecorder = new MediaRecorder(this.stream, {
-                        mimeType: 'video/webm;codecs=vp9'
-                    });
-                    
-                    this.mediaRecorder.ondataavailable = (event) => {
-                        if (event.data.size > 0) {
-                            this.recordedChunks.push(event.data);
-                        }
-                    };
-                    
-                    this.mediaRecorder.onstop = () => {
-                        this.processBtn.disabled = false;
-                    };
-                    
-                    this.mediaRecorder.start(100); // 100ms 간격으로 데이터 수집
-                    
-                    this.isRecording = true;
-                    this.startTime = Date.now();
-                    
-                    // UI 업데이트
-                    this.recordBtn.textContent = '⏹️ 녹화 중지';
-                    this.recordBtn.classList.add('recording');
-                    this.recordingStatus.classList.add('recording');
-                    this.updateStatus('녹화 진행 중', 'recording');
+                    recordBtn.disabled = true;
+                    stopBtn.disabled = false;
+                    timer.style.display = 'block';
                     
                     // 타이머 시작
-                    this.startTimer();
-                    this.startSlamSimulation();
+                    timerInterval = setInterval(updateTimer, 1000);
+                };
+                
+                mediaRecorder.onstop = function() {
+                    log(`녹화 중지됨. 총 청크: ${chunks.length}`);
+                    isRecording = false;
+                    updateStatus('녹화 완료!', 'success');
                     
-                } catch (error) {
-                    console.error('녹화 시작 실패:', error);
-                    alert('녹화를 시작할 수 없습니다.');
-                }
+                    recordBtn.disabled = false;
+                    stopBtn.disabled = true;
+                    timer.style.display = 'none';
+                    
+                    if (timerInterval) {
+                        clearInterval(timerInterval);
+                    }
+                    
+                    // 녹화된 데이터 처리
+                    if (chunks.length > 0) {
+                        const blob = new Blob(chunks, { type: mimeType });
+                        log(`최종 파일 크기: ${blob.size} bytes`);
+                        
+                        // 다운로드 링크 생성 (테스트용)
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `room_scan_${Date.now()}.webm`;
+                        a.textContent = '녹화된 동영상 다운로드';
+                        a.style.display = 'block';
+                        a.style.margin = '10px 0';
+                        a.style.textAlign = 'center';
+                        document.querySelector('.container').appendChild(a);
+                        
+                        log('다운로드 링크 생성됨');
+                    }
+                };
+                
+                mediaRecorder.onerror = function(event) {
+                    log(`MediaRecorder 오류: ${event.error}`);
+                    updateStatus(`녹화 오류: ${event.error}`, 'error');
+                };
+                
+                // 녹화 시작
+                mediaRecorder.start(1000); // 1초마다 데이터 수집
+                
+            } catch (error) {
+                log(`녹화 시작 실패: ${error.name} - ${error.message}`);
+                updateStatus(`녹화 오류: ${error.message}`, 'error');
             }
-            
-            stopRecording() {
-                if (this.mediaRecorder && this.isRecording) {
-                    this.mediaRecorder.stop();
-                    this.isRecording = false;
-                    
-                    // UI 업데이트
-                    this.recordBtn.textContent = '🔴 녹화 시작';
-                    this.recordBtn.classList.remove('recording');
-                    this.recordingStatus.classList.remove('recording');
-                    this.updateStatus('녹화 완료! 평면도 생성 버튼을 누르세요', 'ready');
-                    
-                    // 타이머 중지
-                    this.stopTimer();
-                    this.stopSlamSimulation();
-                }
+        }
+        
+        // 녹화 중지
+        function stopRecording() {
+            if (mediaRecorder && isRecording) {
+                log('녹화 중지 요청...');
+                mediaRecorder.stop();
             }
-            
-            startTimer() {
-                this.recordingInterval = setInterval(() => {
-                    const elapsed = Math.floor((Date.now() - this.startTime) / 1000);
-                    const minutes = Math.floor(elapsed / 60);
-                    const seconds = elapsed % 60;
-                    
-                    this.recordingTimer.textContent = 
-                        `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-                    this.recordingTimer.classList.add('active');
-                }, 1000);
+        }
+        
+        // 타이머 업데이트
+        function updateTimer() {
+            if (recordingStartTime) {
+                const elapsed = Math.floor((Date.now() - recordingStartTime) / 1000);
+                const minutes = Math.floor(elapsed / 60);
+                const seconds = elapsed % 60;
+                timer.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
             }
+        }
+        
+        // 기능 테스트
+        function runTests() {
+            log('=== 기능 테스트 시작 ===');
             
-            stopTimer() {
-                if (this.recordingInterval) {
-                    clearInterval(this.recordingInterval);
+            // 기본 테스트
+            log('1. 버튼 클릭 테스트: ✅');
+            log('2. JavaScript 실행: ✅');
+            log('3. 콘솔 로그: ✅');
+            
+            // 현재 상태 체크
+            log(`4. 스트림 상태: ${stream ? '✅ 활성' : '❌ 없음'}`);
+            log(`5. 녹화 상태: ${isRecording ? '✅ 진행중' : '❌ 중지'}`);
+            log(`6. 비디오 표시: ${video.style.display !== 'none' ? '✅' : '❌'}`);
+            
+            updateStatus('테스트 완료 - 콘솔 확인', 'info');
+            
+            // 알림으로도 표시
+            alert('기능 테스트 완료!\n콘솔과 디버그 정보를 확인하세요.');
+        }
+        
+        // 전역 오류 처리
+        window.onerror = function(message, source, lineno, colno, error) {
+            log(`전역 오류: ${message} (${source}:${lineno}:${colno})`);
+            return false;
+        };
+        
+        // Promise 오류 처리
+        window.addEventListener('unhandledrejection', function(event) {
+            log(`Promise 오류: ${event.reason}`);
+        });
+        
+        log('스크립트 로딩 완료');
+    </script>
+</body>
+</html>
