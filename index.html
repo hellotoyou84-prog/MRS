@@ -155,48 +155,83 @@
         let recordingStartTime = null;
         let timerInterval = null;
         
-        // 디버그 로그 함수
+        // 디버그 로그 함수 (안전한 버전)
         function log(message) {
             console.log(message);
-            const now = new Date().toLocaleTimeString();
-            debugInfo.innerHTML += `[${now}] ${message}<br>`;
-            debugInfo.scrollTop = debugInfo.scrollHeight;
+            
+            // debugInfo 요소가 있을 때만 화면에 표시
+            if (debugInfo && debugInfo.innerHTML !== undefined) {
+                const now = new Date().toLocaleTimeString();
+                debugInfo.innerHTML += `[${now}] ${message}<br>`;
+                debugInfo.scrollTop = debugInfo.scrollHeight;
+            }
         }
         
-        // 상태 업데이트 함수
+        // 상태 업데이트 함수 (안전한 버전)
         function updateStatus(message, type = 'info') {
-            status.textContent = message;
-            status.className = `status ${type}`;
+            console.log(`상태: ${message}`);
+            
+            if (status) {
+                status.textContent = message;
+                status.className = `status ${type}`;
+            }
+            
             log(`상태: ${message}`);
         }
         
         // 페이지 로드 완료 시 초기화
         document.addEventListener('DOMContentLoaded', function() {
-            log('DOM 로딩 완료');
+            console.log('DOM 로딩 시작');
             
-            // 요소들 가져오기
-            video = document.getElementById('video');
-            startBtn = document.getElementById('startBtn');
-            recordBtn = document.getElementById('recordBtn');
-            stopBtn = document.getElementById('stopBtn');
-            testBtn = document.getElementById('testBtn');
-            status = document.getElementById('status');
-            debugInfo = document.getElementById('debugInfo');
-            timer = document.getElementById('timer');
-            
-            log('모든 요소 찾기 완료');
-            
-            // 브라우저 호환성 체크
-            checkBrowserSupport();
-            
-            // 이벤트 리스너 등록
-            startBtn.addEventListener('click', startCamera);
-            recordBtn.addEventListener('click', startRecording);
-            stopBtn.addEventListener('click', stopRecording);
-            testBtn.addEventListener('click', runTests);
-            
-            log('이벤트 리스너 등록 완료');
-            updateStatus('준비 완료! 카메라 시작 버튼을 누르세요');
+            try {
+                // 요소들 가져오기
+                video = document.getElementById('video');
+                startBtn = document.getElementById('startBtn');
+                recordBtn = document.getElementById('recordBtn');
+                stopBtn = document.getElementById('stopBtn');
+                testBtn = document.getElementById('testBtn');
+                status = document.getElementById('status');
+                debugInfo = document.getElementById('debugInfo');
+                timer = document.getElementById('timer');
+                
+                // 모든 요소가 제대로 찾아졌는지 확인
+                const elements = {
+                    video, startBtn, recordBtn, stopBtn, testBtn, status, debugInfo, timer
+                };
+                
+                let allFound = true;
+                for (let [name, element] of Object.entries(elements)) {
+                    if (!element) {
+                        console.error(`요소를 찾을 수 없음: ${name}`);
+                        allFound = false;
+                    }
+                }
+                
+                if (!allFound) {
+                    console.error('일부 요소를 찾을 수 없습니다!');
+                    return;
+                }
+                
+                console.log('모든 요소 찾기 완료');
+                log('DOM 로딩 완료');
+                log('모든 요소 찾기 완료');
+                
+                // 브라우저 호환성 체크
+                checkBrowserSupport();
+                
+                // 이벤트 리스너 등록
+                startBtn.addEventListener('click', startCamera);
+                recordBtn.addEventListener('click', startRecording);
+                stopBtn.addEventListener('click', stopRecording);
+                testBtn.addEventListener('click', runTests);
+                
+                log('이벤트 리스너 등록 완료');
+                updateStatus('준비 완료! 카메라 시작 버튼을 누르세요');
+                
+            } catch (error) {
+                console.error('초기화 중 오류:', error);
+                alert(`초기화 오류: ${error.message}`);
+            }
         });
         
         // 브라우저 호환성 체크
@@ -390,18 +425,39 @@
             alert('기능 테스트 완료!\n콘솔과 디버그 정보를 확인하세요.');
         }
         
-        // 전역 오류 처리
+        // 전역 오류 처리 (안전한 버전)
         window.onerror = function(message, source, lineno, colno, error) {
-            log(`전역 오류: ${message} (${source}:${lineno}:${colno})`);
+            console.error(`전역 오류: ${message} (${source}:${lineno}:${colno})`);
+            
+            // debugInfo가 있을 때만 화면에 표시
+            if (debugInfo && debugInfo.innerHTML !== undefined) {
+                const now = new Date().toLocaleTimeString();
+                debugInfo.innerHTML += `[${now}] ❌ 오류: ${message}<br>`;
+                debugInfo.scrollTop = debugInfo.scrollHeight;
+            }
+            
             return false;
         };
         
-        // Promise 오류 처리
+        // Promise 오류 처리 (안전한 버전)
         window.addEventListener('unhandledrejection', function(event) {
-            log(`Promise 오류: ${event.reason}`);
+            console.error(`Promise 오류: ${event.reason}`);
+            
+            if (debugInfo && debugInfo.innerHTML !== undefined) {
+                const now = new Date().toLocaleTimeString();
+                debugInfo.innerHTML += `[${now}] ❌ Promise 오류: ${event.reason}<br>`;
+                debugInfo.scrollTop = debugInfo.scrollHeight;
+            }
         });
         
-        log('스크립트 로딩 완료');
+        console.log('스크립트 로딩 완료');
+        
+        // 추가 안전 장치: DOM이 준비되기 전에 실행되는 코드 방지
+        if (document.readyState === 'loading') {
+            console.log('DOM 아직 로딩 중...');
+        } else {
+            console.log('DOM 이미 준비됨');
+        }
     </script>
 </body>
 </html>
