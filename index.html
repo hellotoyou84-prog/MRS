@@ -687,18 +687,138 @@
             
             async startCamera() {
                 try {
+                    // 먼저 카메라 권한 확인
+                    this.updateStatus('카메라 권한 확인 중...', 'processing');
+                    
+                    // 권한 요청
+                    const permissionStatus = await this.requestCameraPermission();
+                    if (!permissionStatus) {
+                        return;
+                    }
+                    
+                    this.updateStatus('카메라 시작 중...', 'processing');
+                    
                     const quality = this.qualitySelector.value;
                     const constraints = this.getVideoConstraints(quality);
                     
                     this.stream = await navigator.mediaDevices.getUserMedia(constraints);
                     this.videoElement.srcObject = this.stream;
                     
-                    this.updateStatus('카메라 준비 완료', 'ready');
+                    // 비디오 로드 완료 대기
+                    this.videoElement.onloadedmetadata = () => {
+                        this.updateStatus('카메라 준비 완료! 녹화를 시작하세요', 'ready');
+                        this.recordBtn.disabled = false;
+                    };
                     
                 } catch (error) {
                     console.error('카메라 접근 실패:', error);
-                    alert('카메라에 접근할 수 없습니다. 권한을 확인해주세요.');
+                    this.handleCameraError(error);
                 }
+            }
+            
+            async requestCameraPermission() {
+                try {
+                    // 권한 상태 확인
+                    if (navigator.permissions) {
+                        const permission = await navigator.permissions.query({ name: 'camera' });
+                        console.log('카메라 권한 상태:', permission.state);
+                        
+                        if (permission.state === 'denied') {
+                            this.showPermissionGuide();
+                            return false;
+                        }
+                    }
+                    
+                    // 테스트 스트림으로 권한 확인
+                    const testStream = await navigator.mediaDevices.getUserMedia({ 
+                        video: { facingMode: 'environment' } 
+                    });
+                    
+                    // 테스트 성공하면 스트림 정지
+                    testStream.getTracks().forEach(track => track.stop());
+                    
+                    return true;
+                    
+                } catch (error) {
+                    console.error('권한 요청 실패:', error);
+                    this.handlePermissionError(error);
+                    return false;
+                }
+            }
+            
+            handleCameraError(error) {
+                let errorMessage = '카메라에 접근할 수 없습니다.';
+                let solution = '';
+                
+                switch(error.name) {
+                    case 'NotAllowedError':
+                        errorMessage = '카메라 권한이 거부되었습니다.';
+                        solution = '브라우저 설정에서 카메라 권한을 허용해주세요.';
+                        break;
+                    case 'NotFoundError':
+                        errorMessage = '카메라를 찾을 수 없습니다.';
+                        solution = '카메라가 연결되어 있는지 확인해주세요.';
+                        break;
+                    case 'NotSupportedError':
+                        errorMessage = '브라우저에서 지원하지 않는 기능입니다.';
+                        solution = 'Chrome, Safari, Edge 등 최신 브라우저를 사용해주세요.';
+                        break;
+                    case 'NotReadableError':
+                        errorMessage = '카메라가 다른 앱에서 사용 중입니다.';
+                        solution = '다른 카메라 앱을 종료한 후 다시 시도해주세요.';
+                        break;
+                    default:
+                        solution = 'HTTPS 사이트에서 최신 브라우저로 접속해주세요.';
+                }
+                
+                this.updateStatus(errorMessage, 'error');
+                
+                // 상세한 해결 방법 표시
+                setTimeout(() => {
+                    alert(`${errorMessage}\n\n해결 방법:\n${solution}\n\n현재 URL이 https://로 시작하는지 확인해주세요.`);
+                }, 500);
+            }
+            
+            handlePermissionError(error) {
+                if (error.name === 'NotAllowedError') {
+                    this.showPermissionGuide();
+                } else {
+                    this.handleCameraError(error);
+                }
+            }
+            
+            showPermissionGuide() {
+                const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+                const isAndroid = /Android/.test(navigator.userAgent);
+                
+                let guide = '카메라 권한 허용 방법:\n\n';
+                
+                if (isIOS) {
+                    guide += '📱 iPhone/iPad:\n';
+                    guide += '1. 설정 → Safari → 카메라\n';
+                    guide += '2. "허용" 선택\n';
+                    guide += '3. 페이지 새로고침\n\n';
+                } else if (isAndroid) {
+                    guide += '📱 Android:\n';
+                    guide += '1. 주소창 왼쪽 자물쇠 아이콘 클릭\n';
+                    guide += '2. 카메라 → 허용\n';
+                    guide += '3. 페이지 새로고침\n\n';
+                } else {
+                    guide += '💻 PC:\n';
+                    guide += '1. 주소창 카메라 아이콘 클릭\n';
+                    guide += '2. "항상 허용" 선택\n';
+                    guide += '3. 페이지 새로고침\n\n';
+                }
+                
+                guide += '⚠️ 중요: HTTPS 사이트에서만 작동합니다!';
+                
+                alert(guide);
+                
+                this.updateStatus('카메라 권한을 허용한 후 페이지를 새로고침하세요', 'error');
+                
+                // 새로고침 버튼 추가
+                this.recordBtn.textContent = '🔄 새로고침';
+                this.recordBtn.onclick = () => location.reload();
             }
             
             getVideoConstraints(quality) {
@@ -728,10 +848,62 @@
             }
             
             async toggleRecording() {
+                if (!this.stream) {
+                    // 카메라가 아직 시작되지 않았으면 먼저 시작
+                    alert('카메라를 먼저 시작해야 합니다. 자동으로 카메라를 시작합니다.');
+                    await this.startCamera();
+                    return;
+                }
+                
                 if (!this.isRecording) {
                     await this.startRecording();
                 } else {
                     this.stopRecording();
+                }
+            }
+            
+            constructor() {
+                this.isRecording = false;
+                this.mediaRecorder = null;
+                this.recordedChunks = [];
+                this.startTime = null;
+                this.stream = null;
+                
+                // SLAM 시뮬레이션 데이터
+                this.slamData = {
+                    featurePoints: [],
+                    cameraPath: [],
+                    distanceTraveled: 0,
+                    currentSpeed: 0,
+                    roomCount: 0,
+                    trackingQuality: 'good'
+                };
+                
+                // 타이머
+                this.recordingInterval = null;
+                this.slamUpdateInterval = null;
+                
+                this.initializeElements();
+                this.setupEventListeners();
+                
+                // 자동으로 카메라 시작 시도
+                this.autoStartCamera();
+            }
+            
+            async autoStartCamera() {
+                // 페이지 로드 시 자동으로 카메라 시작 시도
+                this.updateStatus('카메라 권한 확인 중...', 'processing');
+                this.recordBtn.disabled = true;
+                this.recordBtn.textContent = '권한 확인 중...';
+                
+                try {
+                    await this.startCamera();
+                } catch (error) {
+                    // 자동 시작 실패 시 수동 시작 버튼으로 변경
+                    this.recordBtn.disabled = false;
+                    this.recordBtn.textContent = '📹 카메라 시작';
+                    this.recordBtn.onclick = () => this.startCamera();
+                    this.updateStatus('카메라 시작 버튼을 눌러주세요', 'ready');
                 }
             }
             
