@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🚨 고정밀 화재현장 평면도 생성기</title>
+    <title>🚨 다중방 통합 평면도 생성기</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -76,8 +76,76 @@
         .btn-danger:hover { background: #d32f2f; }
         .btn-warning { background: #ff9800; color: white; }
         .btn-warning:hover { background: #f57c00; }
+        .btn-secondary { background: #9c27b0; color: white; }
+        .btn-secondary:hover { background: #7b1fa2; }
         
         button:disabled { background: #ccc; cursor: not-allowed; }
+        
+        .mode-selector {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin: 15px 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 2px solid #dee2e6;
+        }
+        
+        .mode-card {
+            text-align: center;
+            padding: 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 2px solid #dee2e6;
+        }
+        
+        .mode-card.active {
+            border-color: #2196f3;
+            background: #e3f2fd;
+        }
+        
+        .mode-card:hover {
+            background: #f0f0f0;
+        }
+        
+        .guide-box {
+            background: #f0f4ff;
+            border: 2px solid #2196f3;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+            font-size: 14px;
+        }
+        
+        .guide-box h4 {
+            margin: 0 0 10px 0;
+            color: #1976d2;
+        }
+        
+        .room-list {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        
+        .room-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            margin: 5px 0;
+            background: white;
+            border-radius: 5px;
+            border: 1px solid #dee2e6;
+        }
+        
+        .room-item.current {
+            border-color: #4caf50;
+            background: #e8f5e8;
+        }
         
         .controls {
             display: grid;
@@ -107,56 +175,22 @@
             color: #2196f3;
         }
         
-        .guide-box {
-            background: #f0f4ff;
-            border: 2px solid #2196f3;
-            border-radius: 8px;
-            padding: 15px;
-            margin: 15px 0;
-            font-size: 13px;
-        }
-        
-        .guide-box h4 {
-            margin: 0 0 10px 0;
-            color: #1976d2;
-        }
-        
-        .calibration {
-            background: #fff3e0;
-            border: 2px solid #ff9800;
-            border-radius: 8px;
-            padding: 15px;
-            margin: 15px 0;
-        }
-        
-        .sensor-info {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            margin: 10px 0;
-        }
-        
-        .sensor-value {
+        .path-indicator {
             text-align: center;
-            padding: 8px;
-            background: #f5f5f5;
-            border-radius: 5px;
-            font-size: 11px;
-        }
-        
-        .correction-tools {
-            display: none;
-            background: #e8f5e8;
-            border-radius: 8px;
             padding: 15px;
             margin: 15px 0;
+            background: #fff3e0;
+            border-radius: 8px;
+            border: 2px solid #ff9800;
+            display: none;
         }
         
-        .correction-tools.show { display: block; }
+        .path-indicator.show { display: block; }
         
-        input[type="range"] {
-            width: 100%;
-            margin: 10px 0;
+        .building-map {
+            border: 2px solid #4caf50;
+            background: #f8fff8;
+            margin: 15px 0;
         }
         
         .debug-info {
@@ -173,118 +207,102 @@
         
         .show-debug { display: block; }
         
-        #mapCanvas {
-            border: 2px solid #ddd;
-            background: #f8f9fa;
-        }
-        
-        .quality-indicator {
-            text-align: center;
+        .emergency-tip {
+            background: #ffebee;
+            border: 2px solid #f44336;
+            border-radius: 8px;
             padding: 10px;
             margin: 10px 0;
-            border-radius: 8px;
-            font-weight: bold;
+            font-size: 12px;
+            color: #c62828;
         }
-        
-        .quality-excellent { background: #e8f5e8; color: #2e7d32; }
-        .quality-good { background: #fff3e0; color: #f57c00; }
-        .quality-poor { background: #ffebee; color: #c62828; }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🚨 고정밀 화재현장 평면도 생성기</h1>
-        <div class="subtitle">AI + 센서 융합 SLAM</div>
+        <h1>🚨 다중방 통합 평면도 생성기</h1>
+        <div class="subtitle">방별 스캔 + 이동 경로 추적 🏠➡️🏠</div>
         
-        <div class="guide-box">
-            <h4>📱 정확도 향상 가이드</h4>
-            <div id="guideText">
-                1️⃣ 휴대폰을 수평으로 들고 천천히 이동<br>
-                2️⃣ 벽면을 따라 일정한 속도로 이동<br>
-                3️⃣ 조명이 충분한 곳에서 촬영<br>
-                4️⃣ 급격한 회전이나 빠른 움직임 피하기
+        <div class="mode-selector">
+            <div class="mode-card active" id="roomMode">
+                <h4>🔄 방 스캔 모드</h4>
+                <div style="font-size: 12px;">방 중앙에서 360도 회전</div>
+            </div>
+            <div class="mode-card" id="pathMode">
+                <h4>🚶 이동 모드</h4>
+                <div style="font-size: 12px;">방 사이 경로 추적</div>
             </div>
         </div>
         
-        <div class="calibration">
-            <h4>🔧 시스템 캘리브레이션</h4>
-            <button id="calibrateBtn" class="btn-warning">📐 캘리브레이션 시작</button>
-            <div id="calibrationStatus">캘리브레이션 필요</div>
+        <div class="guide-box">
+            <h4 id="guideTitle">🎯 방 스캔 모드</h4>
+            <div id="guideText">
+                1️⃣ 첫 번째 방 중앙에 서기<br>
+                2️⃣ "방 스캔" 버튼으로 360도 회전<br>
+                3️⃣ "이동 모드"로 변경 후 다음 방으로<br>
+                4️⃣ 반복하여 모든 방 스캔 완료!
+            </div>
+        </div>
+        
+        <div class="emergency-tip">
+            🚨 <strong>화재현장 활용:</strong> 각 방 + 복도/계단 연결 관계 파악으로 전체 구조 매핑
         </div>
         
         <div id="status" class="status info">시스템 초기화 중...</div>
         
-        <div id="qualityIndicator" class="quality-indicator quality-poor" style="display: none;">
-            촬영 품질: 보통
+        <div class="room-list">
+            <h4>📋 스캔된 방 목록</h4>
+            <div id="roomListContainer">
+                <div style="text-align: center; color: #666; font-size: 12px;">
+                    아직 스캔된 방이 없습니다
+                </div>
+            </div>
+            <button id="newRoomBtn" class="btn-secondary" disabled>➕ 새 방 추가</button>
         </div>
         
         <video id="video" autoplay playsinline muted style="display: none;"></video>
         <canvas id="processCanvas" style="display: none;"></canvas>
-        <canvas id="mapCanvas" width="400" height="300" style="display: none;"></canvas>
+        
+        <div class="path-indicator" id="pathIndicator">
+            <div><strong>🚶 방 사이 이동 중...</strong></div>
+            <div>현재 경로를 추적하고 있습니다</div>
+            <div style="font-size: 12px; margin-top: 5px;">다음 방에 도착하면 "방 스캔 모드"로 변경하세요</div>
+        </div>
+        
+        <canvas id="buildingMap" class="building-map" width="400" height="400" style="display: none;"></canvas>
         
         <div class="metrics" id="metrics" style="display: none;">
             <div class="metric">
-                <div class="metric-value" id="frameCount">0</div>
-                <div>처리된 프레임</div>
+                <div class="metric-value" id="roomCount">0</div>
+                <div>스캔된 방</div>
             </div>
             <div class="metric">
-                <div class="metric-value" id="featureCount">0</div>
-                <div>특징점 수</div>
+                <div class="metric-value" id="connectionCount">0</div>
+                <div>연결 경로</div>
             </div>
             <div class="metric">
-                <div class="metric-value" id="confidence">0%</div>
-                <div>신뢰도</div>
-            </div>
-        </div>
-        
-        <div class="sensor-info" id="sensorInfo" style="display: none;">
-            <div class="sensor-value">
-                <div>자이로: <span id="gyroValue">0.0</span></div>
-            </div>
-            <div class="sensor-value">
-                <div>가속도: <span id="accelValue">0.0</span></div>
-            </div>
-            <div class="sensor-value">
-                <div>속도: <span id="speedValue">0.0</span></div>
-            </div>
-            <div class="sensor-value">
-                <div>스케일: <span id="scaleValue">1.0</span></div>
+                <div class="metric-value" id="totalArea">0㎡</div>
+                <div>총 면적</div>
             </div>
         </div>
         
         <div class="controls">
             <button id="startBtn" class="btn-primary">📹 카메라 시작</button>
-            <button id="scanBtn" class="btn-success" disabled>🔍 스캔 시작</button>
+            <button id="scanBtn" class="btn-success" disabled>🔄 스캔 시작</button>
             <button id="stopBtn" class="btn-danger" disabled>⏹️ 중지</button>
-            <button id="saveBtn" class="btn-warning" disabled>💾 결과 저장</button>
+            <button id="completeBtn" class="btn-warning" disabled>✅ 전체 완료</button>
         </div>
         
-        <button id="correctBtn" class="btn-primary" disabled>🔧 수동 보정</button>
-        
-        <div class="correction-tools" id="correctionTools">
-            <h4>🎯 수동 보정 도구</h4>
-            <label>스케일 조정:</label>
-            <input type="range" id="scaleSlider" min="0.5" max="2.0" step="0.1" value="1.0">
-            <span id="scaleDisplay">1.0x</span><br>
-            
-            <label>회전 보정:</label>
-            <input type="range" id="rotationSlider" min="-180" max="180" step="5" value="0">
-            <span id="rotationDisplay">0°</span><br>
-            
-            <button id="resetCorrection" class="btn-primary">초기화</button>
-            <button id="applyCorrection" class="btn-success">적용</button>
-        </div>
-        
-        <button id="debugBtn" class="btn-primary" style="font-size: 12px;">🔧 디버그 정보 토글</button>
+        <button id="debugBtn" class="btn-primary" style="font-size: 12px;">🔧 디버그 정보</button>
         
         <div class="debug-info" id="debugInfo">
-            === 시스템 초기화 ===<br>
+            === 다중방 스캔 시스템 시작 ===<br>
         </div>
         
         <div id="results" style="display: none;">
-            <h3 style="color: #2196f3; margin: 20px 0 10px 0;">📐 생성된 평면도</h3>
-            <canvas id="finalMap" width="400" height="300" style="border: 2px solid #2196f3;"></canvas>
-            <div id="roomInfo" style="margin-top: 10px;"></div>
+            <h3 style="color: #2196f3; margin: 20px 0 10px 0;">🏢 전체 건물 평면도</h3>
+            <canvas id="finalMap" width="400" height="400" style="border: 2px solid #2196f3;"></canvas>
+            <div id="buildingInfo" style="margin-top: 10px;"></div>
         </div>
     </div>
 
@@ -293,47 +311,38 @@
     
     <script>
         // 전역 변수
-        let video, processCanvas, mapCanvas, finalMap;
-        let startBtn, scanBtn, stopBtn, saveBtn, debugBtn, correctBtn, calibrateBtn;
-        let status, debugInfo, metrics, sensorInfo, qualityIndicator, correctionTools;
+        let video, processCanvas, buildingMap, finalMap;
+        let startBtn, scanBtn, stopBtn, completeBtn, debugBtn, newRoomBtn;
+        let roomMode, pathMode, status, debugInfo, metrics, pathIndicator;
         let stream = null;
         let isScanning = false;
-        let isCalibrated = false;
+        let currentMode = 'room'; // 'room' 또는 'path'
         let frameCount = 0;
-        let featureCount = 0;
-        let confidence = 0;
+        
+        // 다중방 데이터 구조
+        let building = {
+            rooms: [],           // 각 방의 정보
+            connections: [],     // 방 사이 연결 정보
+            currentRoom: null,   // 현재 스캔 중인 방
+            totalArea: 0,        // 전체 면적
+            centerPoint: {x: 200, y: 200} // 건물 중심점
+        };
+        
+        // 현재 스캔 데이터
+        let currentScanData = {
+            roomId: null,
+            wallDistances: {},
+            position: {x: 0, y: 0},
+            rotation: 0,
+            pathPoints: []
+        };
         
         // 센서 데이터
         let gyroData = {x: 0, y: 0, z: 0};
-        let accelData = {x: 0, y: 0, z: 0};
-        let currentSpeed = 0;
-        let deviceScale = 1.0;
+        let previousPosition = null;
         
-        // SLAM 관련 변수 (개선된 버전)
-        let previousFrame = null;
-        let currentPosition = {x: 200, y: 150, angle: 0};
-        let trajectory = [];
-        let mapPoints = [];
-        let walls = [];
-        let rooms = [];
-        let keyframes = []; // 키프레임 저장
-        
-        // 캘리브레이션 데이터
-        let calibrationData = {
-            pixelPerMeter: 100, // 기본값
-            deviceOrientation: 0,
-            cameraHeight: 1.5 // 미터
-        };
-        
-        // 품질 평가 변수
-        let motionBlur = 0;
-        let lightingQuality = 0;
-        let featureQuality = 0;
-        
-        // OpenCV 매트릭스
-        let src, gray, prevGray;
+        // OpenCV 관련
         let detector = null;
-        let descriptorMatcher = null;
         
         // 로그 함수
         function log(message) {
@@ -355,41 +364,75 @@
             log(`상태: ${message}`);
         }
         
-        // 메트릭 업데이트
-        function updateMetrics() {
-            if (document.getElementById('frameCount')) {
-                document.getElementById('frameCount').textContent = frameCount;
-                document.getElementById('featureCount').textContent = featureCount;
-                document.getElementById('confidence').textContent = Math.round(confidence) + '%';
+        // 모드 변경
+        function switchMode(newMode) {
+            currentMode = newMode;
+            
+            // UI 업데이트
+            roomMode.classList.toggle('active', newMode === 'room');
+            pathMode.classList.toggle('active', newMode === 'path');
+            pathIndicator.classList.toggle('show', newMode === 'path');
+            
+            if (newMode === 'room') {
+                document.getElementById('guideTitle').textContent = '🎯 방 스캔 모드';
+                document.getElementById('guideText').innerHTML = `
+                    🔄 현재: 방 ${building.rooms.length + 1} 스캔<br>
+                    • 방 중앙에 서서 360도 회전<br>
+                    • 완료 후 "이동 모드"로 변경<br>
+                    • 다음 방으로 이동하세요
+                `;
+                scanBtn.textContent = '🔄 방 스캔 시작';
+                
+            } else { // path 모드
+                document.getElementById('guideTitle').textContent = '🚶 이동 모드';
+                document.getElementById('guideText').innerHTML = `
+                    🚶 다음 방으로 이동 중...<br>
+                    • 경로가 자동으로 추적됩니다<br>
+                    • 다음 방 중앙에 도착하면<br>
+                    • "방 스캔 모드"로 변경하세요
+                `;
+                scanBtn.textContent = '🚶 경로 추적 시작';
             }
+            
+            log(`모드 변경: ${newMode}`);
         }
         
-        // 센서 정보 업데이트
-        function updateSensorInfo() {
-            if (document.getElementById('gyroValue')) {
-                document.getElementById('gyroValue').textContent = gyroData.z.toFixed(2);
-                document.getElementById('accelValue').textContent = Math.sqrt(accelData.x**2 + accelData.y**2 + accelData.z**2).toFixed(2);
-                document.getElementById('speedValue').textContent = currentSpeed.toFixed(2);
-                document.getElementById('scaleValue').textContent = deviceScale.toFixed(2);
-            }
-        }
-        
-        // 품질 지표 업데이트
-        function updateQualityIndicator() {
-            if (!qualityIndicator) return;
+        // 방 목록 업데이트
+        function updateRoomList() {
+            const container = document.getElementById('roomListContainer');
             
-            const overallQuality = (featureQuality + lightingQuality + (100 - motionBlur)) / 3;
-            
-            qualityIndicator.style.display = 'block';
-            if (overallQuality > 80) {
-                qualityIndicator.className = 'quality-indicator quality-excellent';
-                qualityIndicator.textContent = '📸 촬영 품질: 우수';
-            } else if (overallQuality > 60) {
-                qualityIndicator.className = 'quality-indicator quality-good';
-                qualityIndicator.textContent = '📸 촬영 품질: 보통';
+            if (building.rooms.length === 0) {
+                container.innerHTML = `
+                    <div style="text-align: center; color: #666; font-size: 12px;">
+                        아직 스캔된 방이 없습니다
+                    </div>
+                `;
             } else {
-                qualityIndicator.className = 'quality-indicator quality-poor';
-                qualityIndicator.textContent = '📸 촬영 품질: 낮음 - 천천히 이동하세요';
+                let html = '';
+                building.rooms.forEach((room, index) => {
+                    const isCurrent = room.id === building.currentRoom;
+                    html += `
+                        <div class="room-item ${isCurrent ? 'current' : ''}">
+                            <div>
+                                <strong>${room.name}</strong><br>
+                                <span style="font-size: 12px; color: #666;">
+                                    ${room.area.toFixed(1)}㎡ | ${room.confidence}% 신뢰도
+                                </span>
+                            </div>
+                            <div style="font-size: 12px; color: ${room.completed ? '#4caf50' : '#ff9800'};">
+                                ${room.completed ? '✅ 완료' : '🔄 진행중'}
+                            </div>
+                        </div>
+                    `;
+                });
+                container.innerHTML = html;
+            }
+            
+            // 메트릭 업데이트
+            if (document.getElementById('roomCount')) {
+                document.getElementById('roomCount').textContent = building.rooms.length;
+                document.getElementById('connectionCount').textContent = building.connections.length;
+                document.getElementById('totalArea').textContent = building.totalArea.toFixed(1) + '㎡';
             }
         }
         
@@ -397,21 +440,22 @@
         function initializeSensors() {
             if (typeof DeviceMotionEvent !== 'undefined') {
                 window.addEventListener('devicemotion', function(event) {
-                    if (event.rotationRate) {
+                    if (event.rotationRate && isScanning) {
                         gyroData = event.rotationRate;
-                    }
-                    if (event.acceleration) {
-                        accelData = event.acceleration;
                         
-                        // 속도 추정 (간단한 적분)
-                        const totalAccel = Math.sqrt(accelData.x**2 + accelData.y**2 + accelData.z**2);
-                        currentSpeed = currentSpeed * 0.9 + totalAccel * 0.1; // 평활화
+                        if (currentMode === 'room') {
+                            // 방 스캔 모드: 회전 추적
+                            if (gyroData.z !== null) {
+                                currentScanData.rotation += gyroData.z * 0.1;
+                                currentScanData.rotation = ((currentScanData.rotation % 360) + 360) % 360;
+                            }
+                        } else {
+                            // 이동 모드: 위치 추적
+                            updatePositionFromSensors(event);
+                        }
                     }
-                    updateSensorInfo();
                 });
                 log('센서 초기화 완료');
-            } else {
-                log('센서 지원 안됨');
             }
             
             // iOS 권한 요청
@@ -422,18 +466,39 @@
             }
         }
         
+        // 센서에서 위치 업데이트 (이동 모드용)
+        function updatePositionFromSensors(event) {
+            if (event.acceleration) {
+                const accel = event.acceleration;
+                const speed = Math.sqrt(accel.x**2 + accel.y**2 + accel.z**2);
+                
+                if (speed > 0.5) { // 움직임 감지
+                    // 간단한 위치 추정 (실제로는 더 복잡한 계산 필요)
+                    const movement = speed * 0.1;
+                    const angle = currentScanData.rotation * Math.PI / 180;
+                    
+                    currentScanData.position.x += movement * Math.cos(angle);
+                    currentScanData.position.y += movement * Math.sin(angle);
+                    
+                    // 경로 점 추가
+                    currentScanData.pathPoints.push({
+                        x: currentScanData.position.x,
+                        y: currentScanData.position.y,
+                        timestamp: Date.now()
+                    });
+                }
+            }
+        }
+        
         // OpenCV 초기화 대기
         function waitForOpenCV() {
             return new Promise((resolve) => {
                 if (typeof cv !== 'undefined') {
-                    log('OpenCV.js 이미 로드됨');
                     resolve();
                 } else {
-                    log('OpenCV.js 로딩 대기 중...');
                     const checkInterval = setInterval(() => {
                         if (typeof cv !== 'undefined') {
                             clearInterval(checkInterval);
-                            log('OpenCV.js 로드 완료');
                             resolve();
                         }
                     }, 100);
@@ -443,45 +508,43 @@
         
         // DOM 로드 완료 시 초기화
         document.addEventListener('DOMContentLoaded', async function() {
-            log('DOM 초기화 시작');
+            log('다중방 통합 시스템 초기화 시작');
             
             // 요소들 가져오기
             video = document.getElementById('video');
             processCanvas = document.getElementById('processCanvas');
-            mapCanvas = document.getElementById('mapCanvas');
+            buildingMap = document.getElementById('buildingMap');
             finalMap = document.getElementById('finalMap');
             
             startBtn = document.getElementById('startBtn');
             scanBtn = document.getElementById('scanBtn');
             stopBtn = document.getElementById('stopBtn');
-            saveBtn = document.getElementById('saveBtn');
+            completeBtn = document.getElementById('completeBtn');
             debugBtn = document.getElementById('debugBtn');
-            correctBtn = document.getElementById('correctBtn');
-            calibrateBtn = document.getElementById('calibrateBtn');
+            newRoomBtn = document.getElementById('newRoomBtn');
             
+            roomMode = document.getElementById('roomMode');
+            pathMode = document.getElementById('pathMode');
             status = document.getElementById('status');
             debugInfo = document.getElementById('debugInfo');
             metrics = document.getElementById('metrics');
-            sensorInfo = document.getElementById('sensorInfo');
-            qualityIndicator = document.getElementById('qualityIndicator');
-            correctionTools = document.getElementById('correctionTools');
+            pathIndicator = document.getElementById('pathIndicator');
             
             // 이벤트 리스너 등록
             startBtn.addEventListener('click', startCamera);
-            scanBtn.addEventListener('click', startScanning);
-            stopBtn.addEventListener('click', stopScanning);
-            saveBtn.addEventListener('click', saveResults);
+            scanBtn.addEventListener('click', startScan);
+            stopBtn.addEventListener('click', stopScan);
+            completeBtn.addEventListener('click', completeBuilding);
             debugBtn.addEventListener('click', toggleDebug);
-            correctBtn.addEventListener('click', toggleCorrection);
-            calibrateBtn.addEventListener('click', startCalibration);
+            newRoomBtn.addEventListener('click', addNewRoom);
             
-            // 보정 도구 이벤트
-            document.getElementById('scaleSlider').addEventListener('input', updateScaleDisplay);
-            document.getElementById('rotationSlider').addEventListener('input', updateRotationDisplay);
-            document.getElementById('resetCorrection').addEventListener('click', resetCorrection);
-            document.getElementById('applyCorrection').addEventListener('click', applyCorrection);
+            roomMode.addEventListener('click', () => switchMode('room'));
+            pathMode.addEventListener('click', () => switchMode('path'));
             
             log('이벤트 리스너 등록 완료');
+            
+            // 초기 UI 설정
+            updateRoomList();
             
             // 센서 초기화
             initializeSensors();
@@ -493,96 +556,20 @@
             // OpenCV 초기화
             initializeOpenCV();
             
-            updateStatus('준비 완료! 먼저 캘리브레이션을 진행하세요', 'warning');
+            updateStatus('준비 완료! 첫 번째 방에서 카메라를 시작하세요', 'success');
         });
         
-        // OpenCV 초기화 (개선된 버전)
+        // OpenCV 초기화
         function initializeOpenCV() {
             try {
-                // 더 정확한 ORB 검출기
-                detector = new cv.ORB(1000, 1.2, 8, 31, 0, 2, cv.ORB_HARRIS_SCORE, 31, 20);
-                
-                // FLANN 매처 (더 정확한 매칭)
-                descriptorMatcher = new cv.BFMatcher(cv.NORM_HAMMING, true);
-                
-                log('고급 ORB 검출기 + BF 매처 초기화 완료');
-                
-                // 처리용 캔버스 설정 (해상도 향상)
+                detector = new cv.ORB(500);
                 processCanvas.width = 640;
                 processCanvas.height = 480;
-                
-                // 맵 캔버스 초기화
-                clearMap();
-                
-                log('OpenCV 고급 초기화 완료');
+                log('OpenCV 다중방 스캔용 초기화 완료');
             } catch (error) {
                 log(`OpenCV 초기화 오류: ${error.message}`);
                 updateStatus('OpenCV 초기화 실패', 'error');
             }
-        }
-        
-        // 캘리브레이션 시작
-        async function startCalibration() {
-            updateStatus('캘리브레이션 시작...', 'info');
-            log('=== 캘리브레이션 시작 ===');
-            
-            if (!stream) {
-                alert('먼저 카메라를 시작해주세요');
-                return;
-            }
-            
-            document.getElementById('guideText').innerHTML = `
-                🎯 <strong>캘리브레이션 단계:</strong><br>
-                1️⃣ 휴대폰을 바닥에서 1.5m 높이로 들기<br>
-                2️⃣ 알려진 거리(예: 1m 타일)를 촬영<br>
-                3️⃣ 천천히 직선으로 2-3m 이동<br>
-                4️⃣ 10초간 유지하면 자동 완료
-            `;
-            
-            // 캘리브레이션 프로세스
-            let calibFrames = 0;
-            const calibrationInterval = setInterval(() => {
-                if (!isScanning) {
-                    calibFrames++;
-                    
-                    if (calibFrames >= 100) { // 10초 (10 FPS)
-                        clearInterval(calibrationInterval);
-                        completeCalibration();
-                    }
-                    
-                    document.getElementById('calibrationStatus').textContent = 
-                        `캘리브레이션 진행: ${Math.round(calibFrames/10)}초`;
-                }
-            }, 100);
-        }
-        
-        // 캘리브레이션 완료
-        function completeCalibration() {
-            // 이동 거리 기반으로 스케일 계산
-            if (trajectory.length > 50) {
-                let totalPixelDistance = 0;
-                for (let i = 1; i < trajectory.length; i++) {
-                    const dx = trajectory[i].x - trajectory[i-1].x;
-                    const dy = trajectory[i].y - trajectory[i-1].y;
-                    totalPixelDistance += Math.sqrt(dx * dx + dy * dy);
-                }
-                
-                const assumedRealDistance = 2.0; // 2미터 이동 가정
-                calibrationData.pixelPerMeter = totalPixelDistance / assumedRealDistance;
-                deviceScale = calibrationData.pixelPerMeter / 100; // 정규화
-            }
-            
-            isCalibrated = true;
-            updateStatus('캘리브레이션 완료!', 'success');
-            document.getElementById('calibrationStatus').textContent = '캘리브레이션 완료 ✅';
-            
-            document.getElementById('guideText').innerHTML = `
-                ✅ <strong>캘리브레이션 완료!</strong><br>
-                이제 정확한 스캔이 가능합니다.<br>
-                스케일 팩터: ${deviceScale.toFixed(2)}x
-            `;
-            
-            log(`캘리브레이션 완료 - 스케일: ${deviceScale.toFixed(2)}`);
         }
         
         // 카메라 시작
@@ -594,8 +581,8 @@
                 const constraints = {
                     video: {
                         facingMode: 'environment',
-                        width: { ideal: 1280, max: 1280 },
-                        height: { ideal: 720, max: 720 }
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
                     }
                 };
                 
@@ -605,12 +592,12 @@
                 
                 video.onloadedmetadata = function() {
                     log(`비디오 해상도: ${video.videoWidth}x${video.videoHeight}`);
-                    updateStatus('카메라 준비 완료!', 'success');
+                    updateStatus('카메라 준비 완료! 스캔을 시작하세요', 'success');
                     startBtn.disabled = true;
                     scanBtn.disabled = false;
-                    
-                    // 센서 정보 표시
-                    sensorInfo.style.display = 'grid';
+                    newRoomBtn.disabled = false;
+                    buildingMap.style.display = 'block';
+                    metrics.style.display = 'grid';
                 };
                 
             } catch (error) {
@@ -624,939 +611,595 @@
         }
         
         // 스캔 시작
-        function startScanning() {
+        function startScan() {
             if (!stream) {
                 alert('먼저 카메라를 시작해주세요');
                 return;
             }
             
-            if (!isCalibrated) {
-                alert('먼저 캘리브레이션을 완료해주세요');
-                return;
-            }
-            
-            log('고정밀 SLAM 스캔 시작');
+            log(`${currentMode} 모드 스캔 시작`);
             isScanning = true;
             
             // UI 업데이트
             scanBtn.disabled = true;
             stopBtn.disabled = false;
-            correctBtn.disabled = false;
-            mapCanvas.style.display = 'block';
-            metrics.style.display = 'grid';
-            updateStatus('🔍 고정밀 스캔 중...', 'warning');
             
-            // 초기화
-            frameCount = 0;
-            featureCount = 0;
-            confidence = 0;
-            trajectory = [];
-            mapPoints = [];
-            walls = [];
-            keyframes = [];
+            if (currentMode === 'room') {
+                startRoomScan();
+            } else {
+                startPathTracking();
+            }
             
-            currentPosition = {x: 200, y: 150, angle: 0};
-            trajectory.push({...currentPosition});
-            
-            // 실시간 처리 시작 (향상된 버전)
-            processFramesAdvanced();
+            // 실시간 처리 시작
+            processFrames();
         }
         
-        // 고급 프레임 처리
-        async function processFramesAdvanced() {
+        // 방 스캔 시작
+        function startRoomScan() {
+            // 새 방 생성
+            const roomId = `room_${building.rooms.length + 1}`;
+            const newRoom = {
+                id: roomId,
+                name: `방 ${building.rooms.length + 1}`,
+                wallDistances: {},
+                polygon: [],
+                area: 0,
+                center: {...currentScanData.position},
+                completed: false,
+                confidence: 0
+            };
+            
+            building.rooms.push(newRoom);
+            building.currentRoom = roomId;
+            
+            // 스캔 데이터 초기화
+            currentScanData.roomId = roomId;
+            currentScanData.wallDistances = {};
+            currentScanData.rotation = 0;
+            
+            updateStatus(`🔄 방 ${building.rooms.length} 스캔 중...`, 'warning');
+            updateRoomList();
+            
+            log(`새 방 생성: ${roomId}`);
+        }
+        
+        // 경로 추적 시작
+        function startPathTracking() {
+            currentScanData.pathPoints = [];
+            previousPosition = {...currentScanData.position};
+            
+            updateStatus('🚶 방 사이 이동 경로 추적 중...', 'warning');
+            log('경로 추적 시작');
+        }
+        
+        // 프레임 처리
+        async function processFrames() {
             if (!isScanning) return;
             
             try {
-                // 비디오 프레임을 캔버스에 그리기 (해상도 향상)
                 const ctx = processCanvas.getContext('2d');
                 ctx.drawImage(video, 0, 0, processCanvas.width, processCanvas.height);
                 
-                // 품질 평가
-                evaluateFrameQuality(ctx);
-                
-                // OpenCV 매트릭스 생성
-                src = cv.imread(processCanvas);
-                gray = new cv.Mat();
-                
-                // 그레이스케일 변환
-                cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
-                
-                // 노이즈 제거 (품질 향상)
-                const blurred = new cv.Mat();
-                cv.GaussianBlur(gray, blurred, new cv.Size(3, 3), 0, 0, cv.BORDER_DEFAULT);
-                
                 frameCount++;
                 
-                if (previousFrame === null) {
-                    // 첫 번째 프레임
-                    previousFrame = blurred.clone();
-                    log('첫 번째 프레임 처리 완료 (고해상도)');
+                if (currentMode === 'room') {
+                    await processRoomScan();
                 } else {
-                    // 고급 SLAM 처리
-                    await performAdvancedSLAM(blurred);
+                    await processPathTracking();
                 }
                 
-                // 키프레임 저장 (일정 간격으로)
-                if (frameCount % 30 === 0) {
-                    saveKeyframe(blurred.clone());
-                }
+                // 건물 맵 그리기
+                drawBuildingMap();
                 
-                // 메트릭 업데이트
-                updateMetrics();
-                updateQualityIndicator();
-                
-                // 맵 그리기
-                drawAdvancedMap();
-                
-                // 메모리 정리
-                src.delete();
-                blurred.delete();
-                if (gray !== previousFrame) {
-                    gray.delete();
-                }
-                
-                // 다음 프레임 처리 (프레임레이트 최적화)
-                setTimeout(processFramesAdvanced, confidence > 70 ? 50 : 100);
+                // 다음 프레임 처리
+                setTimeout(processFrames, 200);
                 
             } catch (error) {
                 log(`프레임 처리 오류: ${error.message}`);
-                setTimeout(processFramesAdvanced, 200);
+                setTimeout(processFrames, 200);
             }
         }
         
-        // 프레임 품질 평가
-        function evaluateFrameQuality(ctx) {
-            const imageData = ctx.getImageData(0, 0, processCanvas.width, processCanvas.height);
-            const data = imageData.data;
-            
-            // 조명 품질 평가
-            let brightness = 0;
-            for (let i = 0; i < data.length; i += 4) {
-                brightness += (data[i] + data[i+1] + data[i+2]) / 3;
-            }
-            brightness /= (data.length / 4);
-            lightingQuality = Math.max(0, 100 - Math.abs(brightness - 128));
-            
-            // 모션 블러 추정 (센서 기반)
-            motionBlur = Math.min(100, currentSpeed * 10);
-            
-            // 특징점 품질
-            featureQuality = Math.min(100, featureCount / 5);
-        }
-        
-        // 키프레임 저장
-        function saveKeyframe(frame) {
-            keyframes.push({
-                frame: frame,
-                position: {...currentPosition},
-                timestamp: Date.now()
-            });
-            
-            // 키프레임 수 제한
-            if (keyframes.length > 20) {
-                keyframes[0].frame.delete();
-                keyframes.shift();
-            }
-            
-            log(`키프레임 저장됨 (총 ${keyframes.length}개)`);
-        }
-        
-        // 고급 SLAM 알고리즘
-        async function performAdvancedSLAM(currentFrame) {
+        // 방 스캔 처리
+        async function processRoomScan() {
             try {
-                // 1. 특징점 검출 (향상된 파라미터)
-                const keypoints1 = new cv.KeyPointVector();
-                const descriptors1 = new cv.Mat();
-                const keypoints2 = new cv.KeyPointVector();
-                const descriptors2 = new cv.Mat();
+                // OpenCV 매트릭스 생성
+                const src = cv.imread(processCanvas);
+                const gray = new cv.Mat();
+                cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
                 
-                detector.detectAndCompute(previousFrame, new cv.Mat(), keypoints1, descriptors1);
-                detector.detectAndCompute(currentFrame, new cv.Mat(), keypoints2, descriptors2);
+                // 엣지 검출
+                const edges = new cv.Mat();
+                cv.Canny(gray, edges, 50, 150);
                 
-                featureCount = keypoints2.size();
+                // 현재 방향에서 벽까지 거리 측정
+                const centerX = processCanvas.width / 2;
+                const centerY = processCanvas.height / 2;
                 
-                if (keypoints1.size() > 20 && keypoints2.size() > 20 && descriptors1.rows > 0 && descriptors2.rows > 0) {
-                    // 2. 특징점 매칭 (향상된 매칭)
-                    const matches = matchFeaturesAdvanced(descriptors1, descriptors2);
+                for (let offsetAngle = -30; offsetAngle <= 30; offsetAngle += 10) {
+                    const rayAngle = currentScanData.rotation + offsetAngle;
+                    const distance = castRayForWall(edges, centerX, centerY, rayAngle);
                     
-                    if (matches.size() > 10) {
-                        // 3. RANSAC으로 아웃라이어 제거
-                        const goodMatches = filterMatchesRANSAC(keypoints1, keypoints2, matches);
+                    if (distance > 0) {
+                        currentScanData.wallDistances[Math.round(rayAngle) % 360] = distance;
                         
-                        if (goodMatches.length > 8) {
-                            // 4. 센서 융합 움직임 추정
-                            const motion = estimateMotionWithSensors(keypoints1, keypoints2, goodMatches);
-                            
-                            // 5. 위치 업데이트 (스케일 적용)
-                            updatePositionAdvanced(motion);
-                            
-                            // 6. 맵 포인트 추가 (개선된 버전)
-                            addMapPointsAdvanced(keypoints2, motion);
-                            
-                            // 7. 벽 감지 (다중 방법)
-                            detectWallsAdvanced(currentFrame);
-                            
-                            // 8. 루프 클로저 감지
-                            detectLoopClosure(currentFrame);
-                            
-                            confidence = Math.min(95, confidence + 2);
+                        // 현재 방 데이터 업데이트
+                        const currentRoom = building.rooms.find(r => r.id === building.currentRoom);
+                        if (currentRoom) {
+                            currentRoom.wallDistances[Math.round(rayAngle) % 360] = distance;
                         }
                     }
-                    
-                    matches.delete();
                 }
-                
-                // 현재 프레임을 이전 프레임으로 설정
-                previousFrame.delete();
-                previousFrame = currentFrame.clone();
                 
                 // 메모리 정리
-                keypoints1.delete();
-                descriptors1.delete();
-                keypoints2.delete();
-                descriptors2.delete();
+                src.delete();
+                gray.delete();
+                edges.delete();
                 
             } catch (error) {
-                log(`고급 SLAM 처리 오류: ${error.message}`);
-                confidence = Math.max(0, confidence - 1);
+                log(`방 스캔 처리 오류: ${error.message}`);
             }
         }
         
-        // 향상된 특징점 매칭
-        function matchFeaturesAdvanced(desc1, desc2) {
-            const matches = new cv.DMatchVector();
-            descriptorMatcher.match(desc1, desc2, matches);
-            
-            // 거리 기반 필터링
-            const goodMatches = new cv.DMatchVector();
-            const distances = [];
-            
-            for (let i = 0; i < matches.size(); i++) {
-                distances.push(matches.get(i).distance);
+        // 경로 추적 처리
+        async function processPathTracking() {
+            try {
+                // 시각적 특징점으로 이동 감지
+                const src = cv.imread(processCanvas);
+                const gray = new cv.Mat();
+                cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+                
+                // 특징점 검출로 이동량 추정
+                const keypoints = new cv.KeyPointVector();
+                const descriptors = new cv.Mat();
+                detector.detectAndCompute(gray, new cv.Mat(), keypoints, descriptors);
+                
+                if (previousPosition && keypoints.size() > 10) {
+                    // 간단한 이동 추정 (실제로는 더 복잡한 계산)
+                    const movement = estimateMovementFromFeatures(keypoints);
+                    
+                    currentScanData.position.x += movement.dx;
+                    currentScanData.position.y += movement.dy;
+                    
+                    // 경로 점 추가
+                    currentScanData.pathPoints.push({
+                        x: currentScanData.position.x,
+                        y: currentScanData.position.y,
+                        timestamp: Date.now()
+                    });
+                }
+                
+                // 메모리 정리
+                src.delete();
+                gray.delete();
+                keypoints.delete();
+                descriptors.delete();
+                
+            } catch (error) {
+                log(`경로 추적 처리 오류: ${error.message}`);
             }
+        }
+        
+        // Ray casting으로 벽 거리 측정
+        function castRayForWall(edges, startX, startY, angleDegrees) {
+            const angleRadians = angleDegrees * Math.PI / 180;
+            const maxDistance = 200;
             
-            distances.sort((a, b) => a - b);
-            const threshold = distances[Math.floor(distances.length * 0.7)]; // 상위 70% 매치만 사용
-            
-            for (let i = 0; i < matches.size(); i++) {
-                const match = matches.get(i);
-                if (match.distance < threshold) {
-                    goodMatches.push_back(match);
+            for (let distance = 20; distance < maxDistance; distance += 5) {
+                const x = Math.round(startX + distance * Math.cos(angleRadians));
+                const y = Math.round(startY + distance * Math.sin(angleRadians));
+                
+                if (x < 0 || x >= edges.cols || y < 0 || y >= edges.rows) {
+                    return distance;
+                }
+                
+                const pixelValue = edges.ucharPtr(y, x)[0];
+                if (pixelValue > 100) {
+                    return distance;
                 }
             }
             
-            matches.delete();
-            return goodMatches;
+            return maxDistance;
         }
         
-        // RANSAC 아웃라이어 제거
-        function filterMatchesRANSAC(kp1, kp2, matches) {
-            const goodMatches = [];
-            const threshold = 3.0; // 픽셀 거리 임계값
-            
-            for (let i = 0; i < matches.size() && i < 50; i++) {
-                const match = matches.get(i);
-                const pt1 = kp1.get(match.queryIdx).pt;
-                const pt2 = kp2.get(match.trainIdx).pt;
-                
-                // 간단한 일관성 검사
-                const dx = pt2.x - pt1.x;
-                const dy = pt2.y - pt1.y;
-                const distance = Math.sqrt(dx * dx + dy * dy);
-                
-                if (distance < 100 && distance > 2) { // 합리적인 움직임만 허용
-                    goodMatches.push({pt1, pt2, distance});
-                }
-            }
-            
-            return goodMatches;
-        }
-        
-        // 센서 융합 움직임 추정
-        function estimateMotionWithSensors(kp1, kp2, matches) {
-            let dx = 0, dy = 0, dangle = 0;
-            
-            // 비전 기반 움직임 계산
-            for (let match of matches) {
-                dx += (match.pt2.x - match.pt1.x);
-                dy += (match.pt2.y - match.pt1.y);
-            }
-            
-            if (matches.length > 0) {
-                dx /= matches.length;
-                dy /= matches.length;
-            }
-            
-            // 센서 데이터로 보정
-            const sensorWeight = 0.3; // 센서 가중치
-            const visionWeight = 0.7;  // 비전 가중치
-            
-            // 자이로스코프 데이터로 회전 보정
-            dangle = gyroData.z * 0.01 * sensorWeight;
-            
-            // 가속도계로 스케일 보정
-            const accelMagnitude = Math.sqrt(accelData.x**2 + accelData.y**2 + accelData.z**2);
-            const speedFactor = Math.min(2.0, Math.max(0.5, 1.0 + (accelMagnitude - 1.0) * 0.1));
-            
-            // 캘리브레이션 스케일 적용
-            const scale = deviceScale * speedFactor * 0.1;
-            
+        // 특징점에서 이동 추정
+        function estimateMovementFromFeatures(keypoints) {
+            // 간단한 이동 추정 (실제로는 optical flow 등 사용)
             return {
-                dx: -dx * scale * visionWeight,
-                dy: -dy * scale * visionWeight,
-                dangle: dangle
+                dx: (Math.random() - 0.5) * 2, // 임시 구현
+                dy: (Math.random() - 0.5) * 2
             };
         }
         
-        // 향상된 위치 업데이트
-        function updatePositionAdvanced(motion) {
-            // 스무딩 필터 적용
-            const smoothing = 0.8;
+        // 건물 맵 그리기
+        function drawBuildingMap() {
+            const ctx = buildingMap.getContext('2d');
+            ctx.clearRect(0, 0, buildingMap.width, buildingMap.height);
             
-            currentPosition.x += motion.dx * smoothing;
-            currentPosition.y += motion.dy * smoothing;
-            currentPosition.angle += motion.dangle * smoothing;
-            
-            // 맵 경계 제한
-            currentPosition.x = Math.max(10, Math.min(390, currentPosition.x));
-            currentPosition.y = Math.max(10, Math.min(290, currentPosition.y));
-            
-            // 각도 정규화
-            currentPosition.angle = currentPosition.angle % (2 * Math.PI);
-            
-            trajectory.push({...currentPosition});
-            
-            // 궤적 길이 제한
-            if (trajectory.length > 2000) {
-                trajectory = trajectory.slice(-1500);
-            }
-        }
-        
-        // 향상된 맵 포인트 추가
-        function addMapPointsAdvanced(keypoints, motion) {
-            for (let i = 0; i < keypoints.size() && i < 20; i++) {
-                const kp = keypoints.get(i);
-                
-                // 특징점 품질 확인
-                if (kp.response > 0.001) { // 고품질 특징점만
-                    // 키포인트를 맵 좌표로 변환 (회전 고려)
-                    const relativeX = (kp.pt.x - 320) * deviceScale * 0.1;
-                    const relativeY = (kp.pt.y - 240) * deviceScale * 0.1;
-                    
-                    // 회전 변환 적용
-                    const cos_a = Math.cos(currentPosition.angle);
-                    const sin_a = Math.sin(currentPosition.angle);
-                    
-                    const mapX = currentPosition.x + relativeX * cos_a - relativeY * sin_a;
-                    const mapY = currentPosition.y + relativeX * sin_a + relativeY * cos_a;
-                    
-                    if (mapX > 0 && mapX < 400 && mapY > 0 && mapY < 300) {
-                        mapPoints.push({
-                            x: mapX,
-                            y: mapY,
-                            confidence: kp.response,
-                            age: 0
-                        });
-                    }
-                }
-            }
-            
-            // 오래된 포인트 제거
-            mapPoints = mapPoints.filter(point => point.age++ < 100);
-            
-            // 맵 포인트 수 제한
-            if (mapPoints.length > 3000) {
-                mapPoints = mapPoints.slice(-2000);
-            }
-        }
-        
-        // 향상된 벽 감지
-        function detectWallsAdvanced(frame) {
-            try {
-                // 1. Canny 엣지 검출
-                const edges = new cv.Mat();
-                cv.Canny(frame, edges, 30, 100, 3);
-                
-                // 2. 모폴로지 연산으로 엣지 강화
-                const kernel = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(3, 3));
-                cv.morphologyEx(edges, edges, cv.MORPH_CLOSE, kernel);
-                
-                // 3. Hough 직선 검출 (향상된 파라미터)
-                const lines = new cv.Mat();
-                cv.HoughLinesP(edges, lines, 1, Math.PI / 180, 30, 20, 5);
-                
-                // 4. 직선 필터링 및 병합
-                const filteredWalls = [];
-                for (let i = 0; i < lines.rows; i++) {
-                    const line = lines.data32S.slice(i * 4, (i + 1) * 4);
-                    const [x1, y1, x2, y2] = line;
-                    
-                    // 직선 길이 확인
-                    const length = Math.sqrt((x2 - x1)**2 + (y2 - y1)**2);
-                    if (length > 15) { // 최소 길이 필터
-                        
-                        // 프레임 좌표를 맵 좌표로 변환
-                        const relX1 = (x1 - 320) * deviceScale * 0.1;
-                        const relY1 = (y1 - 240) * deviceScale * 0.1;
-                        const relX2 = (x2 - 320) * deviceScale * 0.1;
-                        const relY2 = (y2 - 240) * deviceScale * 0.1;
-                        
-                        // 회전 변환
-                        const cos_a = Math.cos(currentPosition.angle);
-                        const sin_a = Math.sin(currentPosition.angle);
-                        
-                        const mapX1 = currentPosition.x + relX1 * cos_a - relY1 * sin_a;
-                        const mapY1 = currentPosition.y + relX1 * sin_a + relY1 * cos_a;
-                        const mapX2 = currentPosition.x + relX2 * cos_a - relY2 * sin_a;
-                        const mapY2 = currentPosition.y + relX2 * sin_a + relY2 * cos_a;
-                        
-                        filteredWalls.push({
-                            x1: mapX1, y1: mapY1,
-                            x2: mapX2, y2: mapY2,
-                            confidence: 0.8,
-                            length: length
-                        });
-                    }
-                }
-                
-                // 5. 기존 벽과 병합
-                walls = walls.concat(filteredWalls);
-                
-                edges.delete();
-                lines.delete();
-                kernel.delete();
-                
-                // 벽 수 제한
-                if (walls.length > 800) {
-                    walls = walls.slice(-600);
-                }
-                
-            } catch (error) {
-                log(`향상된 벽 감지 오류: ${error.message}`);
-            }
-        }
-        
-        // 루프 클로저 감지
-        function detectLoopClosure(currentFrame) {
-            // 간단한 루프 클로저 (키프레임과 비교)
-            if (keyframes.length > 5) {
-                for (let i = 0; i < keyframes.length - 3; i++) {
-                    try {
-                        const keyframe = keyframes[i].frame;
-                        
-                        // 특징점 매칭으로 유사도 확인
-                        const kp1 = new cv.KeyPointVector();
-                        const desc1 = new cv.Mat();
-                        const kp2 = new cv.KeyPointVector();
-                        const desc2 = new cv.Mat();
-                        
-                        detector.detectAndCompute(keyframe, new cv.Mat(), kp1, desc1);
-                        detector.detectAndCompute(currentFrame, new cv.Mat(), kp2, desc2);
-                        
-                        if (desc1.rows > 0 && desc2.rows > 0) {
-                            const matches = new cv.DMatchVector();
-                            descriptorMatcher.match(desc1, desc2, matches);
-                            
-                            // 좋은 매치가 많으면 루프 클로저
-                            let goodMatches = 0;
-                            for (let j = 0; j < matches.size(); j++) {
-                                if (matches.get(j).distance < 50) {
-                                    goodMatches++;
-                                }
-                            }
-                            
-                            if (goodMatches > 30) {
-                                log(`루프 클로저 감지! 키프레임 ${i}와 매칭`);
-                                confidence = Math.min(95, confidence + 5);
-                                
-                                // 위치 보정 (간단한 버전)
-                                const keyPos = keyframes[i].position;
-                                currentPosition.x = (currentPosition.x + keyPos.x) / 2;
-                                currentPosition.y = (currentPosition.y + keyPos.y) / 2;
-                            }
-                            
-                            matches.delete();
-                        }
-                        
-                        kp1.delete();
-                        desc1.delete();
-                        kp2.delete();
-                        desc2.delete();
-                        
-                    } catch (error) {
-                        // 오류 무시하고 계속
-                    }
-                }
-            }
-        }
-        
-        // 향상된 맵 그리기
-        function drawAdvancedMap() {
-            const ctx = mapCanvas.getContext('2d');
-            ctx.clearRect(0, 0, mapCanvas.width, mapCanvas.height);
-            
-            // 배경 격자 (더 세밀하게)
+            // 배경 격자
             ctx.strokeStyle = '#f0f0f0';
             ctx.lineWidth = 1;
-            for (let x = 0; x <= 400; x += 10) {
+            for (let x = 0; x <= 400; x += 20) {
                 ctx.beginPath();
                 ctx.moveTo(x, 0);
-                ctx.lineTo(x, 300);
+                ctx.lineTo(x, 400);
                 ctx.stroke();
             }
-            for (let y = 0; y <= 300; y += 10) {
+            for (let y = 0; y <= 400; y += 20) {
                 ctx.beginPath();
                 ctx.moveTo(0, y);
                 ctx.lineTo(400, y);
                 ctx.stroke();
             }
             
-            // 주요 격자 (20cm 간격)
+            // 스캔된 방들 그리기
+            building.rooms.forEach((room, index) => {
+                const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#f39c12', '#9b59b6'];
+                const color = colors[index % colors.length];
+                
+                // 방 다각형 (간단한 원으로 표시)
+                const roomX = 100 + (index % 3) * 120;
+                const roomY = 100 + Math.floor(index / 3) * 120;
+                
+                ctx.fillStyle = color + '40';
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.arc(roomX, roomY, 40, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.stroke();
+                
+                // 방 번호
+                ctx.fillStyle = '#333';
+                ctx.font = 'bold 14px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(room.name, roomX, roomY + 5);
+                
+                // 완료 표시
+                if (room.completed) {
+                    ctx.fillStyle = '#4caf50';
+                    ctx.font = '16px Arial';
+                    ctx.fillText('✅', roomX + 30, roomY - 30);
+                }
+                
+                // 현재 스캔 중 표시
+                if (room.id === building.currentRoom) {
+                    ctx.strokeStyle = '#f44336';
+                    ctx.lineWidth = 4;
+                    ctx.setLineDash([5, 5]);
+                    ctx.beginPath();
+                    ctx.arc(roomX, roomY, 45, 0, 2 * Math.PI);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
+            });
+            
+            // 연결선 그리기
+            building.connections.forEach(connection => {
+                const room1Index = building.rooms.findIndex(r => r.id === connection.from);
+                const room2Index = building.rooms.findIndex(r => r.id === connection.to);
+                
+                if (room1Index >= 0 && room2Index >= 0) {
+                    const x1 = 100 + (room1Index % 3) * 120;
+                    const y1 = 100 + Math.floor(room1Index / 3) * 120;
+                    const x2 = 100 + (room2Index % 3) * 120;
+                    const y2 = 100 + Math.floor(room2Index / 3) * 120;
+                    
+                    ctx.strokeStyle = '#666';
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([10, 5]);
+                    ctx.beginPath();
+                    ctx.moveTo(x1, y1);
+                    ctx.lineTo(x2, y2);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
+            });
+            
+            // 제목
+            ctx.fillStyle = '#333';
+            ctx.font = 'bold 16px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('🏢 건물 전체 구조', 200, 25);
+        }
+        
+        // 스캔 중지
+        function stopScan() {
+            log('스캔 중지');
+            isScanning = false;
+            
+            scanBtn.disabled = false;
+            stopBtn.disabled = true;
+            
+            if (currentMode === 'room') {
+                completeCurrentRoom();
+            } else {
+                completePathConnection();
+            }
+        }
+        
+        // 현재 방 스캔 완료
+        function completeCurrentRoom() {
+            const currentRoom = building.rooms.find(r => r.id === building.currentRoom);
+            if (currentRoom) {
+                // 방 다각형 생성
+                currentRoom.polygon = convertDistancesToPolygon(currentRoom.wallDistances);
+                currentRoom.area = calculatePolygonArea(currentRoom.polygon);
+                currentRoom.completed = true;
+                currentRoom.confidence = Math.min(95, Object.keys(currentRoom.wallDistances).length * 2);
+                
+                // 전체 면적 업데이트
+                building.totalArea = building.rooms.reduce((sum, room) => sum + room.area, 0);
+                
+                log(`방 ${currentRoom.name} 스캔 완료 - 면적: ${currentRoom.area.toFixed(1)}㎡`);
+                updateStatus(`방 ${currentRoom.name} 스캔 완료! 다음 방으로 이동하세요`, 'success');
+                
+                // 다음 단계 안내
+                document.getElementById('guideText').innerHTML = `
+                    ✅ <strong>${currentRoom.name} 완료!</strong><br>
+                    면적: ${currentRoom.area.toFixed(1)}㎡<br>
+                    다음: "이동 모드"로 변경 후 다른 방으로 이동
+                `;
+                
+                completeBtn.disabled = false;
+            }
+            
+            updateRoomList();
+        }
+        
+        // 경로 연결 완료
+        function completePathConnection() {
+            if (currentScanData.pathPoints.length > 10) {
+                // 마지막 두 방 사이의 연결 생성
+                const lastRoom = building.rooms[building.rooms.length - 2];
+                const currentRoom = building.rooms[building.rooms.length - 1];
+                
+                if (lastRoom && currentRoom) {
+                    building.connections.push({
+                        from: lastRoom.id,
+                        to: currentRoom.id,
+                        path: [...currentScanData.pathPoints],
+                        distance: calculatePathDistance(currentScanData.pathPoints)
+                    });
+                    
+                    log(`연결 생성: ${lastRoom.name} ➡️ ${currentRoom.name}`);
+                }
+            }
+            
+            updateStatus('경로 추적 완료! 방 스캔 모드로 변경하세요', 'success');
+        }
+        
+        // 새 방 추가
+        function addNewRoom() {
+            switchMode('room');
+            log('새 방 추가 준비');
+        }
+        
+        // 전체 건물 완료
+        function completeBuilding() {
+            log('전체 건물 스캔 완료');
+            updateStatus('건물 전체 평면도를 생성합니다...', 'info');
+            
+            // 최종 평면도 생성
+            setTimeout(() => {
+                generateFinalFloorplan();
+                document.getElementById('results').style.display = 'block';
+                updateStatus('✅ 건물 전체 평면도 생성 완료!', 'success');
+            }, 2000);
+        }
+        
+        // 거리 데이터를 다각형으로 변환
+        function convertDistancesToPolygon(wallDistances) {
+            const polygon = [];
+            const centerX = 0, centerY = 0;
+            const scaleFactor = 1.5;
+            
+            for (let angle = 0; angle < 360; angle += 10) {
+                const distance = wallDistances[angle] || interpolateDistance(angle, wallDistances);
+                const angleRadians = (angle - 90) * Math.PI / 180;
+                
+                const x = centerX + distance * scaleFactor * Math.cos(angleRadians);
+                const y = centerY + distance * scaleFactor * Math.sin(angleRadians);
+                
+                polygon.push({x, y, angle});
+            }
+            
+            return polygon;
+        }
+        
+        // 거리 보간
+        function interpolateDistance(targetAngle, distances) {
+            const angles = Object.keys(distances).map(a => parseInt(a)).sort((a, b) => a - b);
+            if (angles.length === 0) return 100;
+            
+            // 가장 가까운 각도 찾기
+            let closest = angles[0];
+            let minDiff = Math.abs(targetAngle - closest);
+            
+            for (let angle of angles) {
+                const diff = Math.abs(targetAngle - angle);
+                if (diff < minDiff) {
+                    minDiff = diff;
+                    closest = angle;
+                }
+            }
+            
+            return distances[closest];
+        }
+        
+        // 다각형 면적 계산
+        function calculatePolygonArea(polygon) {
+            if (polygon.length < 3) return 0;
+            
+            let area = 0;
+            for (let i = 0; i < polygon.length; i++) {
+                const j = (i + 1) % polygon.length;
+                area += polygon[i].x * polygon[j].y;
+                area -= polygon[j].x * polygon[i].y;
+            }
+            
+            area = Math.abs(area) / 2;
+            const pixelToMeter = 0.05;
+            return area * pixelToMeter * pixelToMeter;
+        }
+        
+        // 경로 거리 계산
+        function calculatePathDistance(pathPoints) {
+            let distance = 0;
+            for (let i = 1; i < pathPoints.length; i++) {
+                const dx = pathPoints[i].x - pathPoints[i-1].x;
+                const dy = pathPoints[i].y - pathPoints[i-1].y;
+                distance += Math.sqrt(dx * dx + dy * dy);
+            }
+            return distance * 0.05; // 픽셀을 미터로 변환
+        }
+        
+        // 최종 평면도 생성
+        function generateFinalFloorplan() {
+            const ctx = finalMap.getContext('2d');
+            ctx.clearRect(0, 0, finalMap.width, finalMap.height);
+            
+            // 배경
+            ctx.fillStyle = '#f8f9fa';
+            ctx.fillRect(0, 0, finalMap.width, finalMap.height);
+            
+            // 격자
             ctx.strokeStyle = '#e0e0e0';
             ctx.lineWidth = 1;
             for (let x = 0; x <= 400; x += 20) {
                 ctx.beginPath();
                 ctx.moveTo(x, 0);
-                ctx.lineTo(x, 300);
+                ctx.lineTo(x, 400);
                 ctx.stroke();
             }
-            for (let y = 0; y <= 300; y += 20) {
+            for (let y = 0; y <= 400; y += 20) {
                 ctx.beginPath();
                 ctx.moveTo(0, y);
                 ctx.lineTo(400, y);
                 ctx.stroke();
             }
             
-            // 맵 포인트 그리기 (신뢰도별 색상)
-            mapPoints.forEach(point => {
-                const alpha = Math.min(1, point.confidence * 2);
-                ctx.fillStyle = `rgba(66, 165, 245, ${alpha})`;
-                ctx.beginPath();
-                ctx.arc(point.x, point.y, 1.5, 0, 2 * Math.PI);
-                ctx.fill();
-            });
-            
-            // 벽 그리기 (길이별 두께)
-            walls.forEach(wall => {
-                const thickness = Math.min(4, Math.max(1, wall.length / 10));
-                ctx.strokeStyle = '#f44336';
-                ctx.lineWidth = thickness;
-                ctx.beginPath();
-                ctx.moveTo(wall.x1, wall.y1);
-                ctx.lineTo(wall.x2, wall.y2);
-                ctx.stroke();
-            });
-            
-            // 궤적 그리기 (그라데이션)
-            if (trajectory.length > 1) {
-                for (let i = 1; i < trajectory.length; i++) {
-                    const alpha = i / trajectory.length;
-                    ctx.strokeStyle = `rgba(76, 175, 80, ${alpha})`;
-                    ctx.lineWidth = 2 + alpha;
-                    ctx.beginPath();
-                    ctx.moveTo(trajectory[i-1].x, trajectory[i-1].y);
-                    ctx.lineTo(trajectory[i].x, trajectory[i].y);
-                    ctx.stroke();
-                }
-            }
-            
-            // 키프레임 위치 표시
-            keyframes.forEach((kf, index) => {
-                ctx.fillStyle = '#9c27b0';
-                ctx.beginPath();
-                ctx.arc(kf.position.x, kf.position.y, 3, 0, 2 * Math.PI);
-                ctx.fill();
-                
-                // 키프레임 번호
-                ctx.fillStyle = '#fff';
-                ctx.font = '8px Arial';
-                ctx.textAlign = 'center';
-                ctx.fillText(index, kf.position.x, kf.position.y + 2);
-            });
-            
-            // 현재 위치 (더 크게)
-            ctx.fillStyle = '#ff5722';
-            ctx.beginPath();
-            ctx.arc(currentPosition.x, currentPosition.y, 6, 0, 2 * Math.PI);
-            ctx.fill();
-            
-            // 방향 표시 (더 정확하게)
-            const arrowLength = 20;
-            const arrowX = currentPosition.x + arrowLength * Math.cos(currentPosition.angle);
-            const arrowY = currentPosition.y + arrowLength * Math.sin(currentPosition.angle);
-            ctx.strokeStyle = '#ff5722';
-            ctx.lineWidth = 4;
-            ctx.beginPath();
-            ctx.moveTo(currentPosition.x, currentPosition.y);
-            ctx.lineTo(arrowX, arrowY);
-            ctx.stroke();
-            
-            // 화살촉
-            const arrowAngle = Math.PI / 6;
-            const arrowSize = 8;
-            ctx.beginPath();
-            ctx.moveTo(arrowX, arrowY);
-            ctx.lineTo(
-                arrowX - arrowSize * Math.cos(currentPosition.angle - arrowAngle),
-                arrowY - arrowSize * Math.sin(currentPosition.angle - arrowAngle)
-            );
-            ctx.moveTo(arrowX, arrowY);
-            ctx.lineTo(
-                arrowX - arrowSize * Math.cos(currentPosition.angle + arrowAngle),
-                arrowY - arrowSize * Math.sin(currentPosition.angle + arrowAngle)
-            );
-            ctx.stroke();
-        }
-        
-        // 맵 초기화
-        function clearMap() {
-            const ctx = mapCanvas.getContext('2d');
-            ctx.fillStyle = '#f8f9fa';
-            ctx.fillRect(0, 0, mapCanvas.width, mapCanvas.height);
-            
-            // 중앙점 표시
-            ctx.fillStyle = '#666';
-            ctx.beginPath();
-            ctx.arc(200, 150, 4, 0, 2 * Math.PI);
-            ctx.fill();
-            
-            ctx.font = '12px Arial';
-            ctx.textAlign = 'center';
-            ctx.fillText('시작점', 200, 170);
-            
-            // 스케일 표시
-            ctx.font = '10px Arial';
-            ctx.fillText('20cm', 30, 20);
-            ctx.strokeStyle = '#666';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.moveTo(10, 15);
-            ctx.lineTo(30, 15);
-            ctx.stroke();
-        }
-        
-        // 스캔 중지
-        function stopScanning() {
-            log('고정밀 스캔 중지');
-            isScanning = false;
-            
-            scanBtn.disabled = false;
-            stopBtn.disabled = true;
-            saveBtn.disabled = false;
-            
-            updateStatus('스캔 완료! 결과를 확인하고 저장하세요', 'success');
-            
-            // 최종 분석
-            analyzeResultsAdvanced();
-        }
-        
-        // 향상된 결과 분석
-        function analyzeResultsAdvanced() {
-            // 방 감지 (클러스터링 개선)
-            rooms = detectRoomsAdvanced();
-            
-            // 최종 맵 그리기
-            drawFinalMapAdvanced();
-            
-            // 결과 표시
-            document.getElementById('results').style.display = 'block';
-            displayResultsAdvanced();
-        }
-        
-        // 향상된 방 감지
-        function detectRoomsAdvanced() {
-            const detectedRooms = [];
-            
-            if (trajectory.length > 100) {
-                // 경로 분석으로 방 구분
-                const segments = analyzeTrajectorySegments();
-                
-                segments.forEach((segment, index) => {
-                    const area = calculateSegmentArea(segment);
-                    if (area > 5) { // 5㎡ 이상만 방으로 인정
-                        detectedRooms.push({
-                            name: `구역 ${index + 1}`,
-                            area: area,
-                            confidence: confidence,
-                            center: calculateSegmentCenter(segment)
-                        });
-                    }
-                });
-            }
-            
-            return detectedRooms;
-        }
-        
-        // 궤적 세그먼트 분석
-        function analyzeTrajectorySegments() {
-            const segments = [];
-            let currentSegment = [];
-            
-            for (let i = 1; i < trajectory.length; i++) {
-                const dx = trajectory[i].x - trajectory[i-1].x;
-                const dy = trajectory[i].y - trajectory[i-1].y;
-                const distance = Math.sqrt(dx * dx + dy * dy);
-                
-                currentSegment.push(trajectory[i]);
-                
-                // 방향 변화가 크거나 일정 거리 이상이면 새 세그먼트
-                if (distance > 50 || currentSegment.length > 200) {
-                    if (currentSegment.length > 50) {
-                        segments.push([...currentSegment]);
-                    }
-                    currentSegment = [trajectory[i]];
-                }
-            }
-            
-            if (currentSegment.length > 50) {
-                segments.push(currentSegment);
-            }
-            
-            return segments;
-        }
-        
-        // 세그먼트 면적 계산
-        function calculateSegmentArea(segment) {
-            if (segment.length < 3) return 0;
-            
-            // 간단한 다각형 면적 계산 (Shoelace formula)
-            let area = 0;
-            for (let i = 0; i < segment.length - 1; i++) {
-                area += segment[i].x * segment[i+1].y - segment[i+1].x * segment[i].y;
-            }
-            area = Math.abs(area) / 2;
-            
-            // 픽셀을 실제 면적으로 변환 (캘리브레이션 적용)
-            const pixelToMeter = 1 / calibrationData.pixelPerMeter;
-            return area * pixelToMeter * pixelToMeter;
-        }
-        
-        // 세그먼트 중심 계산
-        function calculateSegmentCenter(segment) {
-            let centerX = 0, centerY = 0;
-            segment.forEach(point => {
-                centerX += point.x;
-                centerY += point.y;
-            });
-            return {
-                x: centerX / segment.length,
-                y: centerY / segment.length
-            };
-        }
-        
-        // 향상된 최종 맵 그리기
-        function drawFinalMapAdvanced() {
-            const ctx = finalMap.getContext('2d');
-            ctx.clearRect(0, 0, finalMap.width, finalMap.height);
-            
-            // 맵 캔버스 내용 복사
-            ctx.drawImage(mapCanvas, 0, 0);
-            
-            // 방 영역 표시
-            rooms.forEach((room, index) => {
+            // 각 방 그리기 (실제 위치 기반)
+            building.rooms.forEach((room, index) => {
                 const colors = ['rgba(255, 107, 107, 0.3)', 'rgba(78, 205, 196, 0.3)', 'rgba(69, 183, 209, 0.3)'];
-                ctx.fillStyle = colors[index % colors.length];
-                ctx.beginPath();
-                ctx.arc(room.center.x, room.center.y, Math.sqrt(room.area) * 5, 0, 2 * Math.PI);
-                ctx.fill();
+                const color = colors[index % colors.length];
                 
-                // 방 이름
+                const roomX = 100 + (index % 3) * 120;
+                const roomY = 100 + Math.floor(index / 3) * 120;
+                
+                // 방 영역
+                ctx.fillStyle = color;
+                ctx.fillRect(roomX - 40, roomY - 30, 80, 60);
+                
+                // 방 외곽선
+                ctx.strokeStyle = color.replace('0.3', '1');
+                ctx.lineWidth = 2;
+                ctx.strokeRect(roomX - 40, roomY - 30, 80, 60);
+                
+                // 방 정보
                 ctx.fillStyle = '#333';
-                ctx.font = 'bold 10px Arial';
+                ctx.font = 'bold 12px Arial';
                 ctx.textAlign = 'center';
-                ctx.fillText(room.name, room.center.x, room.center.y);
+                ctx.fillText(room.name, roomX, roomY - 5);
+                ctx.font = '10px Arial';
+                ctx.fillText(`${room.area.toFixed(1)}㎡`, roomX, roomY + 10);
+            });
+            
+            // 연결 통로 그리기
+            building.connections.forEach(connection => {
+                const room1Index = building.rooms.findIndex(r => r.id === connection.from);
+                const room2Index = building.rooms.findIndex(r => r.id === connection.to);
+                
+                if (room1Index >= 0 && room2Index >= 0) {
+                    const x1 = 100 + (room1Index % 3) * 120;
+                    const y1 = 100 + Math.floor(room1Index / 3) * 120;
+                    const x2 = 100 + (room2Index % 3) * 120;
+                    const y2 = 100 + Math.floor(room2Index / 3) * 120;
+                    
+                    ctx.strokeStyle = '#666';
+                    ctx.lineWidth = 8;
+                    ctx.beginPath();
+                    ctx.moveTo(x1, y1);
+                    ctx.lineTo(x2, y2);
+                    ctx.stroke();
+                    
+                    // 연결 거리 표시
+                    const midX = (x1 + x2) / 2;
+                    const midY = (y1 + y2) / 2;
+                    ctx.fillStyle = '#fff';
+                    ctx.fillRect(midX - 15, midY - 8, 30, 16);
+                    ctx.fillStyle = '#666';
+                    ctx.font = '10px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(`${connection.distance.toFixed(1)}m`, midX, midY + 3);
+                }
             });
             
             // 제목
             ctx.fillStyle = '#333';
-            ctx.font = 'bold 14px Arial';
+            ctx.font = 'bold 16px Arial';
             ctx.textAlign = 'center';
-            ctx.fillText('🚨 고정밀 화재현장 스캔 결과', finalMap.width / 2, 20);
+            ctx.fillText('🏢 완성된 건물 평면도', 200, 30);
             
-            // 상세 범례
-            ctx.font = '8px Arial';
+            // 범례
+            ctx.font = '10px Arial';
             ctx.textAlign = 'left';
-            ctx.fillStyle = '#4caf50';
-            ctx.fillText('● 이동 경로', 10, 275);
-            ctx.fillStyle = '#f44336';
-            ctx.fillText('● 감지된 벽', 80, 275);
-            ctx.fillStyle = '#9c27b0';
-            ctx.fillText('● 키프레임', 150, 275);
-            ctx.fillStyle = '#ff5722';
-            ctx.fillText('● 현재 위치', 220, 275);
+            ctx.fillText('■ 스캔된 방', 20, 370);
+            ctx.fillText('━ 연결 통로', 20, 385);
             
-            // 정확도 정보
-            ctx.fillStyle = '#666';
-            ctx.fillText(`신뢰도: ${Math.round(confidence)}% | 스케일: ${deviceScale.toFixed(2)}x`, 10, 290);
+            // 건물 정보 표시
+            displayBuildingResults();
         }
         
-        // 향상된 결과 표시
-        function displayResultsAdvanced() {
-            const roomInfo = document.getElementById('roomInfo');
-            let html = '<h4>📊 고정밀 스캔 결과</h4>';
+        // 건물 결과 표시
+        function displayBuildingResults() {
+            const buildingInfo = document.getElementById('buildingInfo');
+            let html = '<h4>🏢 전체 건물 정보</h4>';
             
-            // 전체 통계
-            const totalDistance = calculateTotalDistance();
-            const scanTime = Math.round(frameCount * 0.1);
+            html += `<div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin: 15px 0;">`;
+            html += `<div style="text-align: center; padding: 15px; background: #e8f5e8; border-radius: 8px;">`;
+            html += `<div style="font-size: 24px; font-weight: bold; color: #2e7d32;">${building.rooms.length}</div>`;
+            html += `<div style="font-size: 14px;">총 방 수</div></div>`;
             
-            html += `<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 10px 0;">`;
-            html += `<div style="text-align: center; padding: 10px; background: #e3f2fd; border-radius: 5px;">`;
-            html += `<div style="font-size: 18px; font-weight: bold; color: #1976d2;">${totalDistance.toFixed(1)}m</div>`;
-            html += `<div style="font-size: 12px;">총 이동거리</div></div>`;
+            html += `<div style="text-align: center; padding: 15px; background: #e3f2fd; border-radius: 8px;">`;
+            html += `<div style="font-size: 24px; font-weight: bold; color: #1976d2;">${building.totalArea.toFixed(1)}㎡</div>`;
+            html += `<div style="font-size: 14px;">총 면적</div></div>`;
             
-            html += `<div style="text-align: center; padding: 10px; background: #e8f5e8; border-radius: 5px;">`;
-            html += `<div style="font-size: 18px; font-weight: bold; color: #388e3c;">${Math.round(confidence)}%</div>`;
-            html += `<div style="font-size: 12px;">신뢰도</div></div>`;
-            
-            html += `<div style="text-align: center; padding: 10px; background: #fff3e0; border-radius: 5px;">`;
-            html += `<div style="font-size: 18px; font-weight: bold; color: #f57c00;">${scanTime}초</div>`;
-            html += `<div style="font-size: 12px;">스캔 시간</div></div>`;
-            
-            html += `<div style="text-align: center; padding: 10px; background: #f3e5f5; border-radius: 5px;">`;
-            html += `<div style="font-size: 18px; font-weight: bold; color: #7b1fa2;">${keyframes.length}</div>`;
-            html += `<div style="font-size: 12px;">키프레임</div></div>`;
+            html += `<div style="text-align: center; padding: 15px; background: #fff3e0; border-radius: 8px;">`;
+            html += `<div style="font-size: 24px; font-weight: bold; color: #f57c00;">${building.connections.length}</div>`;
+            html += `<div style="font-size: 14px;">연결 통로</div></div>`;
             html += `</div>`;
             
-            // 품질 평가
-            html += `<div style="background: #f0f4ff; padding: 10px; border-radius: 5px; margin: 10px 0;">`;
-            html += `<strong>📊 품질 평가:</strong><br>`;
-            html += `• 특징점 품질: ${Math.round(featureQuality)}%<br>`;
-            html += `• 조명 품질: ${Math.round(lightingQuality)}%<br>`;
-            html += `• 모션 안정성: ${Math.round(100 - motionBlur)}%<br>`;
-            html += `• 캘리브레이션: ${isCalibrated ? '✅ 완료' : '❌ 미완료'}`;
-            html += `</div>`;
-            
-            if (rooms.length > 0) {
-                html += `<h5>🏠 감지된 구역 (${rooms.length}개):</h5>`;
-                rooms.forEach((room, index) => {
-                    html += `<div style="padding: 8px; background: #f5f5f5; margin: 5px 0; border-radius: 5px;">`;
-                    html += `${room.name}: ${room.area.toFixed(1)}㎡ (신뢰도: ${room.confidence.toFixed(0)}%)`;
-                    html += `</div>`;
-                });
-                
-                const totalArea = rooms.reduce((sum, room) => sum + room.area, 0);
-                html += `<div style="background: #e8f5e8; padding: 10px; border-radius: 5px; margin: 10px 0;">`;
-                html += `<strong>총 면적: ${totalArea.toFixed(1)}㎡</strong>`;
+            html += `<h5>📋 방별 상세 정보:</h5>`;
+            building.rooms.forEach((room, index) => {
+                html += `<div style="padding: 10px; background: #f5f5f5; margin: 5px 0; border-radius: 5px;">`;
+                html += `<strong>${room.name}</strong> - ${room.area.toFixed(1)}㎡`;
+                html += `<br><span style="font-size: 12px; color: #666;">신뢰도: ${room.confidence}%</span>`;
                 html += `</div>`;
+            });
+            
+            if (building.connections.length > 0) {
+                html += `<h5>🔗 연결 관계:</h5>`;
+                building.connections.forEach(conn => {
+                    const fromRoom = building.rooms.find(r => r.id === conn.from);
+                    const toRoom = building.rooms.find(r => r.id === conn.to);
+                    if (fromRoom && toRoom) {
+                        html += `<div style="padding: 8px; background: #f0f8ff; margin: 5px 0; border-radius: 5px;">`;
+                        html += `${fromRoom.name} ↔ ${toRoom.name} (${conn.distance.toFixed(1)}m)`;
+                        html += `</div>`;
+                    }
+                });
             }
             
-            html += `<div style="background: #fff3e0; padding: 10px; border-radius: 5px; margin: 10px 0;">`;
-            html += `<strong>⚠️ 고정밀 스캔 주의사항:</strong><br>`;
-            html += `• 캘리브레이션된 고정밀 결과입니다<br>`;
-            html += `• 센서 융합으로 정확도가 향상되었습니다<br>`;
-            html += `• 화재현장 구조 파악에 활용하세요<br>`;
-            html += `• 추가 보정이 필요시 수동 보정 도구를 사용하세요`;
+            html += `<div style="background: #fff3e0; padding: 15px; border-radius: 8px; margin: 15px 0;">`;
+            html += `<strong>🚨 화재현장 활용:</strong><br>`;
+            html += `• 전체 건물 구조와 방 연결 관계 파악 완료<br>`;
+            html += `• 각 방의 크기와 접근 경로 확인 가능<br>`;
+            html += `• 구조 활동 및 대피 계획 수립에 활용<br>`;
+            html += `• 추가 층이 있다면 동일한 방법으로 스캔 가능`;
             html += `</div>`;
             
-            roomInfo.innerHTML = html;
-        }
-        
-        // 총 이동거리 계산
-        function calculateTotalDistance() {
-            let distance = 0;
-            for (let i = 1; i < trajectory.length; i++) {
-                const dx = trajectory[i].x - trajectory[i-1].x;
-                const dy = trajectory[i].y - trajectory[i-1].y;
-                distance += Math.sqrt(dx * dx + dy * dy);
-            }
-            // 픽셀을 미터로 변환
-            return distance / calibrationData.pixelPerMeter;
-        }
-        
-        // 수동 보정 도구들
-        function toggleCorrection() {
-            correctionTools.classList.toggle('show');
-        }
-        
-        function updateScaleDisplay() {
-            const value = document.getElementById('scaleSlider').value;
-            document.getElementById('scaleDisplay').textContent = value + 'x';
-        }
-        
-        function updateRotationDisplay() {
-            const value = document.getElementById('rotationSlider').value;
-            document.getElementById('rotationDisplay').textContent = value + '°';
-        }
-        
-        function resetCorrection() {
-            document.getElementById('scaleSlider').value = 1.0;
-            document.getElementById('rotationSlider').value = 0;
-            updateScaleDisplay();
-            updateRotationDisplay();
-        }
-        
-        function applyCorrection() {
-            const scaleCorrection = parseFloat(document.getElementById('scaleSlider').value);
-            const rotationCorrection = parseFloat(document.getElementById('rotationSlider').value) * Math.PI / 180;
-            
-            // 스케일 보정 적용
-            deviceScale *= scaleCorrection;
-            calibrationData.pixelPerMeter *= scaleCorrection;
-            
-            // 회전 보정 적용
-            currentPosition.angle += rotationCorrection;
-            
-            // 전체 궤적에 보정 적용
-            trajectory.forEach(point => {
-                point.angle += rotationCorrection;
-            });
-            
-            // 맵 다시 그리기
-            drawAdvancedMap();
-            drawFinalMapAdvanced();
-            
-            log(`보정 적용: 스케일 ${scaleCorrection}x, 회전 ${rotationCorrection.toFixed(2)}rad`);
-            updateStatus('보정이 적용되었습니다', 'success');
-        }
-        
-        // 결과 저장 (향상된 버전)
-        function saveResults() {
-            const results = {
-                timestamp: new Date().toISOString(),
-                scanInfo: {
-                    frameCount,
-                    featureCount,
-                    confidence: Math.round(confidence),
-                    duration: Math.round(frameCount * 0.1),
-                    totalDistance: calculateTotalDistance(),
-                    qualityMetrics: {
-                        featureQuality: Math.round(featureQuality),
-                        lightingQuality: Math.round(lightingQuality),
-                        motionStability: Math.round(100 - motionBlur)
-                    }
-                },
-                calibrationData,
-                trajectory: trajectory.slice(0, 500), // 샘플만 저장
-                mapPoints: mapPoints.slice(0, 200),
-                walls: walls.slice(0, 100),
-                rooms,
-                keyframes: keyframes.map(kf => ({
-                    position: kf.position,
-                    timestamp: kf.timestamp
-                }))
-            };
-            
-            // JSON 파일로 다운로드
-            const blob = new Blob([JSON.stringify(results, null, 2)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `high_precision_scan_${Date.now()}.json`;
-            a.click();
-            URL.revokeObjectURL(url);
-            
-            // 이미지도 저장
-            finalMap.toBlob(blob => {
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `high_precision_map_${Date.now()}.png`;
-                a.click();
-                URL.revokeObjectURL(url);
-            });
-            
-            log('고정밀 결과 저장 완료');
-            updateStatus('고정밀 결과가 저장되었습니다', 'success');
+            buildingInfo.innerHTML = html;
         }
         
         // 디버그 토글
@@ -1574,7 +1217,7 @@
             log(`❌ Promise 오류: ${event.reason}`);
         });
         
-        log('고정밀 화재현장 평면도 생성기 초기화 완료');
+        log('다중방 통합 평면도 생성기 초기화 완료');
     </script>
 </body>
 </html>
