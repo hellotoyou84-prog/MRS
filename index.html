@@ -384,14 +384,14 @@
                 scanBtn.textContent = '🔄 방 스캔 시작';
                 
             } else { // path 모드
-                document.getElementById('guideTitle').textContent = '🚶 이동 모드';
+                document.getElementById('guideTitle').textContent = '🚶 이동 모드 (복도 감지)';
                 document.getElementById('guideText').innerHTML = `
                     🚶 다음 방으로 이동 중...<br>
-                    • 경로가 자동으로 추적됩니다<br>
-                    • 다음 방 중앙에 도착하면<br>
-                    • "방 스캔 모드"로 변경하세요
+                    • 복도 양쪽 벽까지의 거리 자동 측정<br>
+                    • 복도 폭과 모양이 실시간 감지됩니다<br>
+                    • 다음 방 중앙에 도착하면 "방 스캔 모드"로 변경
                 `;
-                scanBtn.textContent = '🚶 경로 추적 시작';
+                scanBtn.textContent = '🚶 복도 추적 시작';
             }
             
             log(`모드 변경: ${newMode}`);
@@ -741,13 +741,25 @@
             }
         }
         
-        // 경로 추적 처리
+        // 경로 추적 처리 (복도 모양 감지 포함)
         async function processPathTracking() {
             try {
                 // 시각적 특징점으로 이동 감지
                 const src = cv.imread(processCanvas);
                 const gray = new cv.Mat();
                 cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+                
+                // 엣지 검출로 복도 벽면 감지
+                const edges = new cv.Mat();
+                cv.Canny(gray, edges, 50, 150);
+                
+                // 복도 양옆 벽까지의 거리 측정
+                const centerX = processCanvas.width / 2;
+                const centerY = processCanvas.height / 2;
+                
+                const leftDistance = castRayForWall(edges, centerX, centerY, currentScanData.rotation - 90); // 왼쪽
+                const rightDistance = castRayForWall(edges, centerX, centerY, currentScanData.rotation + 90); // 오른쪽
+                const frontDistance = castRayForWall(edges, centerX, centerY, currentScanData.rotation); // 앞쪽
                 
                 // 특징점 검출로 이동량 추정
                 const keypoints = new cv.KeyPointVector();
@@ -761,17 +773,24 @@
                     currentScanData.position.x += movement.dx;
                     currentScanData.position.y += movement.dy;
                     
-                    // 경로 점 추가
+                    // 복도 정보를 포함한 경로 점 추가
                     currentScanData.pathPoints.push({
                         x: currentScanData.position.x,
                         y: currentScanData.position.y,
+                        leftWall: leftDistance,
+                        rightWall: rightDistance,
+                        frontWall: frontDistance,
+                        corridorWidth: leftDistance + rightDistance,
                         timestamp: Date.now()
                     });
+                    
+                    log(`복도 감지 - 폭: ${(leftDistance + rightDistance) * 0.05}m, 좌벽: ${leftDistance * 0.05}m, 우벽: ${rightDistance * 0.05}m`);
                 }
                 
                 // 메모리 정리
                 src.delete();
                 gray.delete();
+                edges.delete();
                 keypoints.delete();
                 descriptors.delete();
                 
@@ -947,26 +966,58 @@
             updateRoomList();
         }
         
-        // 경로 연결 완료
+        // 경로 연결 완료 (복도 생성 포함)
         function completePathConnection() {
             if (currentScanData.pathPoints.length > 10) {
+                // 복도를 하나의 "공간"으로 생성
+                const corridorId = `corridor_${building.connections.length + 1}`;
+                const corridorName = `복도 ${building.connections.length + 1}`;
+                
+                // 복도의 평균 폭과 길이 계산
+                const avgWidth = currentScanData.pathPoints.reduce((sum, point) => 
+                    sum + (point.corridorWidth || 100), 0) / currentScanData.pathPoints.length * 0.05; // 미터 단위
+                const corridorLength = calculatePathDistance(currentScanData.pathPoints);
+                const corridorArea = avgWidth * corridorLength;
+                
+                // 복도를 건물의 "방" 목록에 추가 (복도도 하나의 공간으로 취급)
+                const corridor = {
+                    id: corridorId,
+                    name: corridorName,
+                    type: 'corridor', // 일반 방과 구분
+                    wallDistances: {},
+                    polygon: generateCorridorPolygon(currentScanData.pathPoints),
+                    area: corridorArea,
+                    width: avgWidth,
+                    length: corridorLength,
+                    center: calculatePathCenter(currentScanData.pathPoints),
+                    completed: true,
+                    confidence: 85,
+                    pathPoints: [...currentScanData.pathPoints]
+                };
+                
+                building.rooms.push(corridor);
+                building.totalArea += corridorArea;
+                
                 // 마지막 두 방 사이의 연결 생성
-                const lastRoom = building.rooms[building.rooms.length - 2];
-                const currentRoom = building.rooms[building.rooms.length - 1];
+                const lastRoom = building.rooms.filter(r => r.type !== 'corridor')[building.rooms.filter(r => r.type !== 'corridor').length - 2];
+                const currentRoom = building.rooms.filter(r => r.type !== 'corridor')[building.rooms.filter(r => r.type !== 'corridor').length - 1];
                 
                 if (lastRoom && currentRoom) {
                     building.connections.push({
                         from: lastRoom.id,
                         to: currentRoom.id,
+                        via: corridorId, // 복도를 통한 연결
                         path: [...currentScanData.pathPoints],
-                        distance: calculatePathDistance(currentScanData.pathPoints)
+                        distance: corridorLength
                     });
                     
-                    log(`연결 생성: ${lastRoom.name} ➡️ ${currentRoom.name}`);
+                    log(`연결 생성: ${lastRoom.name} ➡️ ${corridorName} ➡️ ${currentRoom.name}`);
+                    log(`복도 정보 - 폭: ${avgWidth.toFixed(1)}m, 길이: ${corridorLength.toFixed(1)}m, 면적: ${corridorArea.toFixed(1)}㎡`);
                 }
             }
             
-            updateStatus('경로 추적 완료! 방 스캔 모드로 변경하세요', 'success');
+            updateStatus('복도 정보 포함 경로 추적 완료! 방 스캔 모드로 변경하세요', 'success');
+            updateRoomList();
         }
         
         // 새 방 추가
@@ -1043,6 +1094,47 @@
             return area * pixelToMeter * pixelToMeter;
         }
         
+        // 복도 다각형 생성
+        function generateCorridorPolygon(pathPoints) {
+            const polygon = [];
+            const avgWidth = pathPoints.reduce((sum, point) => 
+                sum + (point.corridorWidth || 100), 0) / pathPoints.length;
+            
+            // 경로를 따라 복도의 양쪽 벽 생성
+            for (let i = 0; i < pathPoints.length; i++) {
+                const point = pathPoints[i];
+                const width = (point.corridorWidth || avgWidth) / 2;
+                
+                // 진행 방향 계산
+                let angle = 0;
+                if (i < pathPoints.length - 1) {
+                    const next = pathPoints[i + 1];
+                    angle = Math.atan2(next.y - point.y, next.x - point.x);
+                }
+                
+                // 양쪽 벽 점 생성
+                const leftX = point.x + width * Math.cos(angle + Math.PI/2);
+                const leftY = point.y + width * Math.sin(angle + Math.PI/2);
+                const rightX = point.x + width * Math.cos(angle - Math.PI/2);
+                const rightY = point.y + width * Math.sin(angle - Math.PI/2);
+                
+                polygon.push({x: leftX, y: leftY, side: 'left'});
+                polygon.push({x: rightX, y: rightY, side: 'right'});
+            }
+            
+            return polygon;
+        }
+        
+        // 경로 중심점 계산
+        function calculatePathCenter(pathPoints) {
+            if (pathPoints.length === 0) return {x: 0, y: 0};
+            
+            const centerX = pathPoints.reduce((sum, point) => sum + point.x, 0) / pathPoints.length;
+            const centerY = pathPoints.reduce((sum, point) => sum + point.y, 0) / pathPoints.length;
+            
+            return {x: centerX, y: centerY};
+        }
+        
         // 경로 거리 계산
         function calculatePathDistance(pathPoints) {
             let distance = 0;
@@ -1081,59 +1173,113 @@
             
             // 각 방 그리기 (실제 위치 기반)
             building.rooms.forEach((room, index) => {
-                const colors = ['rgba(255, 107, 107, 0.3)', 'rgba(78, 205, 196, 0.3)', 'rgba(69, 183, 209, 0.3)'];
-                const color = colors[index % colors.length];
-                
-                const roomX = 100 + (index % 3) * 120;
-                const roomY = 100 + Math.floor(index / 3) * 120;
-                
-                // 방 영역
-                ctx.fillStyle = color;
-                ctx.fillRect(roomX - 40, roomY - 30, 80, 60);
-                
-                // 방 외곽선
-                ctx.strokeStyle = color.replace('0.3', '1');
-                ctx.lineWidth = 2;
-                ctx.strokeRect(roomX - 40, roomY - 30, 80, 60);
-                
-                // 방 정보
-                ctx.fillStyle = '#333';
-                ctx.font = 'bold 12px Arial';
-                ctx.textAlign = 'center';
-                ctx.fillText(room.name, roomX, roomY - 5);
-                ctx.font = '10px Arial';
-                ctx.fillText(`${room.area.toFixed(1)}㎡`, roomX, roomY + 10);
-            });
-            
-            // 연결 통로 그리기
-            building.connections.forEach(connection => {
-                const room1Index = building.rooms.findIndex(r => r.id === connection.from);
-                const room2Index = building.rooms.findIndex(r => r.id === connection.to);
-                
-                if (room1Index >= 0 && room2Index >= 0) {
-                    const x1 = 100 + (room1Index % 3) * 120;
-                    const y1 = 100 + Math.floor(room1Index / 3) * 120;
-                    const x2 = 100 + (room2Index % 3) * 120;
-                    const y2 = 100 + Math.floor(room2Index / 3) * 120;
+                if (room.type === 'corridor') {
+                    // 복도 그리기
+                    if (room.pathPoints && room.pathPoints.length > 1) {
+                        // 복도 중심선
+                        ctx.strokeStyle = '#9e9e9e';
+                        ctx.lineWidth = Math.max(4, room.width * 20); // 폭에 비례한 선 두께
+                        ctx.lineCap = 'round';
+                        ctx.lineJoin = 'round';
+                        
+                        ctx.beginPath();
+                        ctx.moveTo(room.pathPoints[0].x, room.pathPoints[0].y);
+                        for (let i = 1; i < room.pathPoints.length; i++) {
+                            ctx.lineTo(room.pathPoints[i].x, room.pathPoints[i].y);
+                        }
+                        ctx.stroke();
+                        
+                        // 복도 양쪽 벽 그리기
+                        ctx.strokeStyle = '#666';
+                        ctx.lineWidth = 2;
+                        
+                        const leftWall = [];
+                        const rightWall = [];
+                        
+                        for (let i = 0; i < room.pathPoints.length; i++) {
+                            const point = room.pathPoints[i];
+                            const halfWidth = (room.width * 10) || 15; // 반폭
+                            
+                            // 진행 방향 계산
+                            let angle = 0;
+                            if (i < room.pathPoints.length - 1) {
+                                const next = room.pathPoints[i + 1];
+                                angle = Math.atan2(next.y - point.y, next.x - point.x);
+                            } else if (i > 0) {
+                                const prev = room.pathPoints[i - 1];
+                                angle = Math.atan2(point.y - prev.y, point.x - prev.x);
+                            }
+                            
+                            // 양쪽 벽 점 계산
+                            const leftX = point.x + halfWidth * Math.cos(angle + Math.PI/2);
+                            const leftY = point.y + halfWidth * Math.sin(angle + Math.PI/2);
+                            const rightX = point.x + halfWidth * Math.cos(angle - Math.PI/2);
+                            const rightY = point.y + halfWidth * Math.sin(angle - Math.PI/2);
+                            
+                            leftWall.push({x: leftX, y: leftY});
+                            rightWall.push({x: rightX, y: rightY});
+                        }
+                        
+                        // 왼쪽 벽 그리기
+                        if (leftWall.length > 1) {
+                            ctx.beginPath();
+                            ctx.moveTo(leftWall[0].x, leftWall[0].y);
+                            for (let i = 1; i < leftWall.length; i++) {
+                                ctx.lineTo(leftWall[i].x, leftWall[i].y);
+                            }
+                            ctx.stroke();
+                        }
+                        
+                        // 오른쪽 벽 그리기
+                        if (rightWall.length > 1) {
+                            ctx.beginPath();
+                            ctx.moveTo(rightWall[0].x, rightWall[0].y);
+                            for (let i = 1; i < rightWall.length; i++) {
+                                ctx.lineTo(rightWall[i].x, rightWall[i].y);
+                            }
+                            ctx.stroke();
+                        }
+                        
+                        // 복도 정보 표시
+                        const midPoint = room.pathPoints[Math.floor(room.pathPoints.length / 2)];
+                        ctx.fillStyle = '#fff';
+                        ctx.fillRect(midPoint.x - 25, midPoint.y - 8, 50, 16);
+                        ctx.fillStyle = '#666';
+                        ctx.font = '10px Arial';
+                        ctx.textAlign = 'center';
+                        ctx.fillText(`${room.name}`, midPoint.x, midPoint.y - 1);
+                        ctx.fillText(`${room.width.toFixed(1)}m×${room.length.toFixed(1)}m`, midPoint.x, midPoint.y + 8);
+                    }
+                } else {
+                    // 일반 방 그리기
+                    const colors = ['rgba(255, 107, 107, 0.3)', 'rgba(78, 205, 196, 0.3)', 'rgba(69, 183, 209, 0.3)'];
+                    const roomIndex = building.rooms.filter(r => r.type !== 'corridor').indexOf(room);
+                    const color = colors[roomIndex % colors.length];
                     
-                    ctx.strokeStyle = '#666';
-                    ctx.lineWidth = 8;
-                    ctx.beginPath();
-                    ctx.moveTo(x1, y1);
-                    ctx.lineTo(x2, y2);
-                    ctx.stroke();
+                    const roomX = 100 + (roomIndex % 3) * 120;
+                    const roomY = 100 + Math.floor(roomIndex / 3) * 120;
                     
-                    // 연결 거리 표시
-                    const midX = (x1 + x2) / 2;
-                    const midY = (y1 + y2) / 2;
-                    ctx.fillStyle = '#fff';
-                    ctx.fillRect(midX - 15, midY - 8, 30, 16);
-                    ctx.fillStyle = '#666';
-                    ctx.font = '10px Arial';
+                    // 방 영역
+                    ctx.fillStyle = color;
+                    ctx.fillRect(roomX - 40, roomY - 30, 80, 60);
+                    
+                    // 방 외곽선
+                    ctx.strokeStyle = color.replace('0.3', '1');
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(roomX - 40, roomY - 30, 80, 60);
+                    
+                    // 방 정보
+                    ctx.fillStyle = '#333';
+                    ctx.font = 'bold 12px Arial';
                     ctx.textAlign = 'center';
-                    ctx.fillText(`${connection.distance.toFixed(1)}m`, midX, midY + 3);
+                    ctx.fillText(room.name, roomX, roomY - 5);
+                    ctx.font = '10px Arial';
+                    ctx.fillText(`${room.area.toFixed(1)}㎡`, roomX, roomY + 10);
                 }
             });
+            
+            // 연결선은 복도로 대체되므로 단순한 선은 그리지 않음
+            // (복도가 실제 연결 역할을 함)
             
             // 제목
             ctx.fillStyle = '#333';
@@ -1145,7 +1291,7 @@
             ctx.font = '10px Arial';
             ctx.textAlign = 'left';
             ctx.fillText('■ 스캔된 방', 20, 370);
-            ctx.fillText('━ 연결 통로', 20, 385);
+            ctx.fillText('━ 복도/통로 (실제 폭)', 20, 385);
             
             // 건물 정보 표시
             displayBuildingResults();
@@ -1170,22 +1316,46 @@
             html += `<div style="font-size: 14px;">연결 통로</div></div>`;
             html += `</div>`;
             
-            html += `<h5>📋 방별 상세 정보:</h5>`;
-            building.rooms.forEach((room, index) => {
+            html += `<h5>📋 공간별 상세 정보:</h5>`;
+            
+            // 일반 방들
+            const regularRooms = building.rooms.filter(r => r.type !== 'corridor');
+            regularRooms.forEach((room, index) => {
                 html += `<div style="padding: 10px; background: #f5f5f5; margin: 5px 0; border-radius: 5px;">`;
-                html += `<strong>${room.name}</strong> - ${room.area.toFixed(1)}㎡`;
+                html += `<strong>🏠 ${room.name}</strong> - ${room.area.toFixed(1)}㎡`;
                 html += `<br><span style="font-size: 12px; color: #666;">신뢰도: ${room.confidence}%</span>`;
                 html += `</div>`;
             });
+            
+            // 복도들
+            const corridors = building.rooms.filter(r => r.type === 'corridor');
+            if (corridors.length > 0) {
+                html += `<h6 style="margin-top: 15px; color: #666;">🚪 복도 및 통로:</h6>`;
+                corridors.forEach((corridor, index) => {
+                    html += `<div style="padding: 10px; background: #f0f0f0; margin: 5px 0; border-radius: 5px;">`;
+                    html += `<strong>🚪 ${corridor.name}</strong> - ${corridor.area.toFixed(1)}㎡`;
+                    html += `<br><span style="font-size: 12px; color: #666;">`;
+                    html += `폭: ${corridor.width.toFixed(1)}m, 길이: ${corridor.length.toFixed(1)}m`;
+                    html += `</span>`;
+                    html += `</div>`;
+                });
+            }
             
             if (building.connections.length > 0) {
                 html += `<h5>🔗 연결 관계:</h5>`;
                 building.connections.forEach(conn => {
                     const fromRoom = building.rooms.find(r => r.id === conn.from);
                     const toRoom = building.rooms.find(r => r.id === conn.to);
+                    const viaRoom = conn.via ? building.rooms.find(r => r.id === conn.via) : null;
+                    
                     if (fromRoom && toRoom) {
                         html += `<div style="padding: 8px; background: #f0f8ff; margin: 5px 0; border-radius: 5px;">`;
-                        html += `${fromRoom.name} ↔ ${toRoom.name} (${conn.distance.toFixed(1)}m)`;
+                        if (viaRoom) {
+                            html += `${fromRoom.name} ↔ <strong>${viaRoom.name}</strong> ↔ ${toRoom.name}`;
+                            html += `<br><span style="font-size: 12px; color: #666;">총 거리: ${conn.distance.toFixed(1)}m</span>`;
+                        } else {
+                            html += `${fromRoom.name} ↔ ${toRoom.name} (${conn.distance.toFixed(1)}m)`;
+                        }
                         html += `</div>`;
                     }
                 });
